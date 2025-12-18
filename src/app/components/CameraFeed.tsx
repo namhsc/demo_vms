@@ -1,13 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback, use } from "react";
-import {
-  Settings,
-  X,
-  Play,
-  Pause,
-  Maximize,
-  Minimize2,
-  Save,
-} from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Settings, X, Play, Pause, Maximize, Save } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -156,7 +148,6 @@ export function LiveviewFeed({
   };
 
   const videoRef = useRef(null);
-  // const pcRef = useRef<RTCPeerConnection | null>(null);
 
   // Update URL when initialUrl changes
   useEffect(() => {
@@ -169,55 +160,54 @@ export function LiveviewFeed({
     if (!rtspUrl || rtspUrl.trim() === "") {
       return;
     }
+    let retryTimer: number | null = null;
+    const MAX_RETRY = 3;
+    let attempt = 0;
 
-    try {
-      const rtspMatch = rtspUrl.match(/rtsp:\/\/([^\/]+)(\/.*)?/);
-      if (rtspMatch) {
-        setIsSettingsOpen(false);
+    const rtspMatch = rtspUrl.match(/rtsp:\/\/([^\/]+)(\/.*)?/);
 
-        createStream(rtspUrl)
-          .then((data) => {
-            if (data && data.whepUrl) {
-              setCurrentUrl(data.whepUrl);
-              setIsSettingsOpen(false);
-            } else {
-              setCurrentUrl("");
-              console.error("Lỗi tạo link stream");
-            }
-          })
-          .catch(() => {
-            setTimeout(
-              () =>
-                createStream(rtspUrl)
-                  .then((d) => {
-                    if (d && d.whepUrl) {
-                      setCurrentUrl(d.whepUrl);
-                      setIsSettingsOpen(false);
-                    } else {
-                      setCurrentUrl("");
-                      console.error("Lỗi tạo link stream");
-                    }
-                  })
-                  .catch(() => setCurrentUrl("")),
-              5000
-            );
-          });
-      } else {
-        console.error("Invalid RTSP URL format");
-      }
-    } catch (err) {
-      console.error("Error converting RTSP URL:", err);
+    if (!rtspMatch) {
+      console.error("Invalid RTSP URL format");
+      return;
     }
+
+    const fetchStream = async () => {
+      try {
+        attempt++;
+        const data = await createStream(rtspUrl);
+
+        if (data?.whepUrl) {
+          setCurrentUrl(data.whepUrl);
+          setIsSettingsOpen(false);
+          return; // success → stop retry
+        }
+
+        throw new Error("Server returned no WHEP URL");
+      } catch (err) {
+        console.error(`CreateStream failed (attempt ${attempt}):`, err);
+
+        if (attempt < MAX_RETRY) {
+          retryTimer = setTimeout(fetchStream, 5000);
+        } else {
+          console.error("Max retry exceeded");
+          setCurrentUrl("");
+        }
+      }
+    };
+
+    fetchStream();
+
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [rtspUrl]);
 
   const handleApplySettings = () => {
-    console.log("rtspUrlInput", rtspUrlInput);
     setRtspUrl(rtspUrlInput);
   };
 
   useEffect(() => {
     if (!currentUrl) return;
-    console.log("currentUrl", currentUrl);
     const video = videoRef.current as any;
     const pc = new RTCPeerConnection({
       iceServers: [],
@@ -273,17 +263,16 @@ export function LiveviewFeed({
         console.log("WebRTC connected:", currentUrl);
       } catch (err) {
         console.error("WebRTC error:", err);
+        setTimeout(connect, 5000);
       }
     };
-
-    let retryTimer: any;
 
     const connect = async () => {
       try {
         await startWebRTC();
       } catch (err) {
         console.error("WebRTC failed, retry in 3s...");
-        retryTimer = setTimeout(connect, 3000); // auto reconnect
+        setTimeout(connect, 3000);
       }
     };
 
