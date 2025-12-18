@@ -35,7 +35,14 @@ export function CameraGrid({
       width={1200}
       autoSize={true}
       onLayoutChange={onLayoutChange}
-      gridConfig={{ cols: 12, rowHeight: 150 }}
+      gridConfig={{
+        cols: 12,
+        rowHeight: 150,
+      }}
+      dragConfig={{
+        handle: ".camera-header", // ✔ chỉ kéo khi người dùng nhấn vào header
+        cancel: ".camera-content", // ✔ chặn kéo tại content (dùng để zoom/pan)
+      }}
     >
       {visibleCameras.map((camera) => (
         <div

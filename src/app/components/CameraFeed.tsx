@@ -49,8 +49,8 @@ const generatePattern = () => {
   return "";
 };
 
-const MAX_ZOOM = 5;
-const MIN_ZOOM = 1;
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
 
 export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
   const [isLive, setIsLive] = useState(true);
@@ -59,8 +59,12 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
   const [timestamp, setTimestamp] = useState(new Date());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const lastPos = useRef({ x: 0, y: 0 });
+  const videoContentRef = useRef<HTMLDivElement>(null);
   const [scaleZoom, setScaleZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -167,39 +171,63 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
 
     start();
 
-    // Cleanup khi unmount
     return () => {
       pc.close();
     };
   }, [url]);
 
-  const handleWheel = useCallback(
-    (e: WheelEvent) => {
-      e.preventDefault(); // chặn scroll trang khi zoom
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
 
-      let newZoom = scaleZoom;
+    let nextScale = scaleZoom + (e.deltaY > 0 ? -0.1 : 0.1);
+    nextScale = Math.min(Math.max(nextScale, 1), 5); // min 1 - max 5
 
-      if (e.deltaY < 0) {
-        // Zoom in
-        newZoom = Math.min(MAX_ZOOM, scaleZoom + 0.1);
-      } else {
-        // Zoom out
-        newZoom = Math.max(MIN_ZOOM, scaleZoom - 0.1);
-      }
+    if (nextScale === 1) {
+      // Reset pan khi về mức zoom 1
+      setOffset({ x: 0, y: 0 });
+    }
 
-      setScaleZoom(parseFloat(newZoom.toFixed(2)));
-    },
-    [scaleZoom]
-  );
+    setScaleZoom(nextScale);
+  };
 
   useEffect(() => {
-    const div = containerRef.current;
+    const div = videoContentRef.current;
     if (!div) return;
 
     div.addEventListener("wheel", handleWheel, { passive: false });
 
     return () => div.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scaleZoom === 1) return; // không pan khi chưa zoom
+    setIsPanning(true);
+    lastPos.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isPanning || !videoContentRef.current) return;
+
+    const dx = e.clientX - lastPos.current.x;
+    const dy = e.clientY - lastPos.current.y;
+
+    lastPos.current = { x: e.clientX, y: e.clientY };
+
+    const container = videoContentRef.current.getBoundingClientRect();
+    const videoW = container.width * scaleZoom;
+    const videoH = container.height * scaleZoom;
+
+    const maxX = (videoW - container.width) / 2;
+    const maxY = (videoH - container.height) / 2;
+
+    setOffset((prev) => ({
+      x: clamp(prev.x + dx, -maxX, maxX),
+      y: clamp(prev.y + dy, -maxY, maxY),
+    }));
+  };
+
+  const handleMouseUp = () => setIsPanning(false);
+  const handleMouseLeave = () => setIsPanning(false);
 
   return (
     <div
@@ -210,7 +238,7 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
     >
       {/* Camera Header */}
       <div
-        className={`flex items-center justify-between ${
+        className={`camera-header z-10 flex items-center justify-between ${
           isFullscreen ? "px-6 py-4" : "px-3 py-2"
         } bg-slate-800 border-b border-slate-700`}
       >
@@ -242,14 +270,25 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
           </button>
         </div>
       </div>
-
-      <div className="flex-1 relative bg-slate-800">
+      {/* Camera Content */}
+      <div
+        className="camera-content flex-1 relative bg-slate-800"
+        ref={videoContentRef}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onMouseMove={(e) => handleMouseMove(e.nativeEvent)}
+      >
         <div
           className="absolute inset-0 flex items-center justify-center"
           style={{
-            transform: `scale(${scaleZoom})`,
+            transform: `
+      scale(${scaleZoom})
+      translate(${offset.x / scaleZoom}px, ${offset.y / scaleZoom}px)
+    `,
             transformOrigin: "center center",
-            transition: "transform 0.15s ease-out",
+            transition: isPanning ? "none" : "transform 0.15s ease-out",
+            cursor: scaleZoom > 1 ? "grab" : "default",
           }}
         >
           <div className="absolute inset-0">
@@ -259,16 +298,21 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
               className="w-full h-full object-cover"
             />
           </div>
-          <div className="absolute inset-0">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              controls={false}
-              style={{ width: "100%", height: "100%", objectFit: "fill" }}
-            />
-          </div>
+          {/* <div className="absolute inset-0"> */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            controls={false}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "fill",
+              zIndex: 2,
+            }}
+          />
+          {/* </div> */}
         </div>
 
         <div className="absolute inset-0 flex items-center justify-center">
