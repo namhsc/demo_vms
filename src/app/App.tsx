@@ -17,6 +17,7 @@ export interface Camera {
   name: string;
   hidden?: boolean;
   url?: string;
+  segments?: VideoSegment[];
 }
 
 export interface VideoSegment {
@@ -27,17 +28,20 @@ export interface VideoSegment {
 }
 
 const SEGMENT_GAP_SECONDS = 30 * 60; // 30 phút
+const CAMERA_OFFSET_SECONDS = 10 * 60; // mỗi camera lệch 10 phút
 
-const createSegmentsFromVideo = (durationSeconds: number): VideoSegment[] => {
+const createSegmentsForCamera = (
+  durationSeconds: number,
+  startOffsetSeconds: number
+): VideoSegment[] => {
   const segments: VideoSegment[] = [];
 
   let index = 0;
-  let start = 0;
+  let start = startOffsetSeconds;
 
   while (start < DAY_SECONDS) {
     const end = start + durationSeconds;
 
-    // Không cho segment vượt quá 24h
     if (end > DAY_SECONDS) break;
 
     segments.push({
@@ -114,12 +118,13 @@ function App() {
   });
 
   const handleLayoutChange = (layout: Layout) => {
-    console.log("Layout changed:", layout);
     const updatedCameras = cameras.map((camera) => {
       const layoutItem = layout.find((item) => item.i === camera.i);
       if (layoutItem) {
+        const { segments, ...cameraWithoutSegments } = camera as any;
+
         return {
-          ...camera,
+          ...cameraWithoutSegments,
           x: layoutItem.x,
           y: layoutItem.y,
           w: layoutItem.w,
@@ -182,20 +187,24 @@ function App() {
 
     video.onloadedmetadata = () => {
       const durationSeconds = video.duration;
-      const segments = createSegmentsFromVideo(durationSeconds);
+
+      setCameras((prev) => {
+        return prev.map((item, index) => ({
+          ...item,
+          segments: createSegmentsForCamera(
+            durationSeconds,
+            index * CAMERA_OFFSET_SECONDS // lệch 10 phút mỗi camera
+          ),
+        }));
+      });
 
       setDuration(durationSeconds);
-      setSegments(segments);
     };
 
     video.ontimeupdate = () => {
       setCurrentTime(video.currentTime);
     };
   }, []);
-
-  useEffect(() => {
-    console.log("segmentss", segments);
-  }, [segments]);
 
   useEffect(() => {
     const active = segments.find(
@@ -224,6 +233,12 @@ function App() {
 
     return () => clearInterval(interval);
   }, [isPlaying, playbackSpeed, duration, viewMode]);
+
+  useEffect(() => {
+    const findSegment = cameras.find((cam) => cam.i === activePlaybackCamera);
+    if (!findSegment) return;
+    setSegments(findSegment.segments || []);
+  }, [activePlaybackCamera]);
 
   return (
     <>
