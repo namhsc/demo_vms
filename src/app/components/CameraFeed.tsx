@@ -209,35 +209,38 @@ export function LiveviewFeed({
   useEffect(() => {
     if (!currentUrl) return;
     const video = videoRef.current as any;
-    const pc = new RTCPeerConnection({
-      iceServers: [],
-    });
+    let pc: RTCPeerConnection | null = null;
+    let retryTimer: number | null = null;
 
     if (!video) {
       console.error("Video element not found");
       return;
     }
-    // Khi nhận được track từ MediaMTX → hiển thị lên video
-    pc.ontrack = (event) => {
-      console.log("✔ Track received");
-      video.srcObject = event.streams[0];
-      setIsLive(true);
+    const createPeer = () => {
+      pc = new RTCPeerConnection({ iceServers: [] });
+
+      pc.ontrack = (event) => {
+        console.log("✔ Track received");
+        video.srcObject = event.streams[0];
+        setIsLive(true);
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) console.log("ICE:", event.candidate);
+      };
+
+      return pc;
     };
 
-    // Debug ICE (không cần gửi ICE lên MediaMTX)
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        console.log("New ICE candidate:", event.candidate);
-      }
-    };
-
-    // Bắt đầu WebRTC
     const startWebRTC = async () => {
+      if (!pc) pc = createPeer(); // luôn luôn tạo pc mới
+
       try {
         const offer = await pc.createOffer({
           offerToReceiveVideo: true,
           offerToReceiveAudio: true,
         });
+
         await pc.setLocalDescription(offer);
 
         const authHeader = "Basic " + btoa(`${VIEWER_USER}:${VIEWER_PASS}`);
@@ -257,13 +260,12 @@ export function LiveviewFeed({
         }
 
         const answerSDP = await response.text();
-
         await pc.setRemoteDescription({ type: "answer", sdp: answerSDP });
 
         console.log("WebRTC connected:", currentUrl);
       } catch (err) {
         console.error("WebRTC error:", err);
-        setTimeout(connect, 5000);
+        throw err;
       }
     };
 
@@ -271,15 +273,29 @@ export function LiveviewFeed({
       try {
         await startWebRTC();
       } catch (err) {
-        console.error("WebRTC failed, retry in 3s...");
-        setTimeout(connect, 3000);
+        console.warn("Retry WebRTC in 3s...");
+
+        // Destroy PC cũ trước khi retry
+        if (pc) {
+          pc.getSenders().forEach((s) => s.track?.stop());
+          pc.close();
+          pc = null;
+        }
+
+        retryTimer = window.setTimeout(connect, 3000);
       }
     };
 
     connect();
+
     return () => {
-      pc.getSenders().forEach((s) => s.track && s.track.stop());
-      pc.close();
+      if (retryTimer) clearTimeout(retryTimer);
+
+      if (pc) {
+        pc.getSenders().forEach((s) => s.track?.stop());
+        pc.close();
+        pc = null;
+      }
     };
   }, [currentUrl]);
 
