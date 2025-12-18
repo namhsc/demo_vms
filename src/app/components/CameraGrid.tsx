@@ -1,7 +1,6 @@
-import React from 'react';
-import GridLayout from 'react-grid-layout';
-import { CameraFeed } from './CameraFeed';
-import 'react-grid-layout/css/styles.css';
+import GridLayout, { Layout } from "react-grid-layout";
+import { CameraFeed } from "./CameraFeed";
+import "react-grid-layout/css/styles.css";
 
 interface Camera {
   i: string;
@@ -15,43 +14,42 @@ interface Camera {
 
 interface CameraGridProps {
   cameras: Camera[];
-  onLayoutChange: (layout: any[]) => void;
+  onLayoutChange: (layout: Layout) => void;
   onRemoveCamera: (id: string) => void;
   cols?: number;
   rowHeight?: number;
 }
 
-export function CameraGrid({ 
-  cameras, 
-  onLayoutChange, 
+export function CameraGrid({
+  cameras,
+  onLayoutChange,
   onRemoveCamera,
-  cols = 12,
-  rowHeight = 150 
 }: CameraGridProps) {
-  
   // Filter out hidden cameras
-  const visibleCameras = cameras.filter(camera => !camera.hidden);
-  
+  const visibleCameras = cameras.filter((camera) => !camera.hidden);
+
   return (
     <GridLayout
       className="layout"
       layout={visibleCameras}
-      cols={cols}
-      rowHeight={rowHeight}
       width={1200}
+      autoSize={true}
       onLayoutChange={onLayoutChange}
-      draggableHandle=".drag-handle"
-      isDraggable={true}
-      isResizable={true}
-      compactType={null}
-      preventCollision={false}
+      gridConfig={{ cols: 12, rowHeight: 150 }}
     >
       {visibleCameras.map((camera) => (
-        <div 
-          key={camera.i} 
+        <div
+          key={camera.i}
+          data-grid={{
+            x: camera.x,
+            y: camera.y,
+            w: camera.w,
+            h: camera.h,
+          }}
           className="bg-slate-800 rounded-lg overflow-hidden"
-          style={{ 
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' 
+          style={{
+            boxShadow:
+              "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
           }}
         >
           <div className="drag-handle cursor-move h-full">
@@ -59,6 +57,7 @@ export function CameraGrid({
               id={camera.i}
               name={camera.name}
               onRemove={onRemoveCamera}
+              url={"http://192.168.17.43:8889/cam1/whep"}
             />
           </div>
         </div>
