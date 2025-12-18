@@ -71,10 +71,7 @@ export function CameraGrid({
                 name={camera.name}
                 onRemove={onRemoveCamera}
                 onHide={onToggleCamera}
-                url={
-                  // ""
-                  "rtsp://admin:AdminCam@192.168.16.239:554/Streaming/Channels/101?transportmode=unicast&profile=Profile_1"
-                }
+                url={camera.url || ""}
               />
             ) : (
               <PlaybackFeed

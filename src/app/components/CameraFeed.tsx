@@ -76,7 +76,7 @@ export function LiveviewFeed({
   onHide,
   url: initialUrl,
 }: CameraFeedProps) {
-  const [isLive, setIsLive] = useState(true);
+  const [isLive, setIsLive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [timestamp, setTimestamp] = useState(new Date());
@@ -367,7 +367,7 @@ export function LiveviewFeed({
         <div className="flex items-center gap-2">
           <div
             className={`w-2 h-2 rounded-full ${
-              isLive ? "bg-red-500 animate-pulse" : "bg-gray-500"
+              isLive ? "bg-green-500 animate-pulse" : "bg-gray-500"
             } ${isFullscreen ? "w-3 h-3" : "w-2 h-2"}`}
           />
           <span className="text-sm text-white">{name}</span>
