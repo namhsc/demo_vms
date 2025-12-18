@@ -4,7 +4,7 @@ import { CameraList } from "./components/CameraList";
 import { Grid3x3, RotateCcw, Settings, Video } from "lucide-react";
 import { Layout } from "react-grid-layout";
 
-interface Camera {
+export interface Camera {
   i: string;
   x: number;
   y: number;
@@ -12,56 +12,74 @@ interface Camera {
   h: number;
   name: string;
   hidden?: boolean;
+  url: string;
 }
 
+const urlList = [
+  "rtsp://admin:AdminCam@192.168.16.239:554/Streaming/Channels/101?transportmode=unicast&profile=Profile_1",
+  "rtsp://admin:123456a@@27.72.146.175:1055/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif",
+];
+
+export function getRandomItem<T>(list: T[]): T {
+  const index = Math.floor(Math.random() * list.length);
+  return list[index];
+}
+
+const listLayoutDefault: Camera[] = [
+  {
+    i: "cam-1",
+    x: 0,
+    y: 0,
+    w: 4,
+    h: 2,
+    name: "Camera 1 - Entrance",
+    hidden: false,
+    url: getRandomItem(urlList),
+  },
+  {
+    i: "cam-2",
+    x: 4,
+    y: 0,
+    w: 4,
+    h: 2,
+    name: "Camera 2 - Parking Lot",
+    hidden: false,
+    url: getRandomItem(urlList),
+  },
+  {
+    i: "cam-3",
+    x: 8,
+    y: 0,
+    w: 4,
+    h: 2,
+    name: "Camera 3 - Lobby",
+    hidden: false,
+    url: getRandomItem(urlList),
+  },
+  {
+    i: "cam-4",
+    x: 0,
+    y: 2,
+    w: 6,
+    h: 2,
+    name: "Camera 4 - Office Area",
+    hidden: false,
+    url: getRandomItem(urlList),
+  },
+  {
+    i: "cam-5",
+    x: 6,
+    y: 2,
+    w: 6,
+    h: 2,
+    name: "Camera 5 - Warehouse",
+    hidden: false,
+    url: getRandomItem(urlList),
+  },
+];
+
 function App() {
-  const [cameras, setCameras] = useState<Camera[]>([
-    {
-      i: "cam-1",
-      x: 0,
-      y: 0,
-      w: 4,
-      h: 2,
-      name: "Camera 1 - Entrance",
-      hidden: false,
-    },
-    {
-      i: "cam-2",
-      x: 4,
-      y: 0,
-      w: 4,
-      h: 2,
-      name: "Camera 2 - Parking Lot",
-      hidden: false,
-    },
-    {
-      i: "cam-3",
-      x: 8,
-      y: 0,
-      w: 4,
-      h: 2,
-      name: "Camera 3 - Lobby",
-      hidden: false,
-    },
-    {
-      i: "cam-4",
-      x: 0,
-      y: 2,
-      w: 6,
-      h: 2,
-      name: "Camera 4 - Office Area",
-      hidden: false,
-    },
-    {
-      i: "cam-5",
-      x: 6,
-      y: 2,
-      w: 6,
-      h: 2,
-      name: "Camera 5 - Warehouse",
-      hidden: false,
-    },
-  ]);
+  const [cameras, setCameras] = useState<Camera[]>(listLayoutDefault);
 
   const [nextCameraId, setNextCameraId] = useState(6);
 
@@ -84,10 +102,13 @@ function App() {
   };
 
   const handleRemoveCamera = (id: string) => {
+    console.log("Remove camera:", id);
     setCameras(cameras.filter((camera) => camera.i !== id));
   };
 
   const handleToggleCamera = (id: string) => {
+    console.log("Remove camera:", id);
+
     setCameras(
       cameras.map((camera) =>
         camera.i === id ? { ...camera, hidden: !camera.hidden } : camera
@@ -96,71 +117,29 @@ function App() {
   };
 
   const handleResetLayout = () => {
-    setCameras([
-      {
-        i: "cam-1",
-        x: 0,
-        y: 0,
-        w: 4,
-        h: 2,
-        name: "Camera 1 - Entrance",
-        hidden: false,
-      },
-      {
-        i: "cam-2",
-        x: 4,
-        y: 0,
-        w: 4,
-        h: 2,
-        name: "Camera 2 - Parking Lot",
-        hidden: false,
-      },
-      {
-        i: "cam-3",
-        x: 8,
-        y: 0,
-        w: 4,
-        h: 2,
-        name: "Camera 3 - Lobby",
-        hidden: false,
-      },
-      {
-        i: "cam-4",
-        x: 0,
-        y: 2,
-        w: 6,
-        h: 2,
-        name: "Camera 4 - Office Area",
-        hidden: false,
-      },
-      {
-        i: "cam-5",
-        x: 6,
-        y: 2,
-        w: 6,
-        h: 2,
-        name: "Camera 5 - Warehouse",
-        hidden: false,
-      },
-    ]);
+    console.log("Remove handleResetLayout:");
+    setCameras(listLayoutDefault);
     setNextCameraId(6);
   };
 
-  const handleLoadLayout = () => {
-    const savedLayout = localStorage.getItem("cameraLayout");
-    if (savedLayout) {
-      const parsedLayout = JSON.parse(savedLayout);
-      setCameras(parsedLayout);
-      const maxId = Math.max(
-        ...parsedLayout.map((cam: Camera) => parseInt(cam.i.split("-")[1]))
-      );
-      setNextCameraId(maxId + 1);
-    }
-  };
+  //   const handleLoadLayout = () => {
+  //     const savedLayout = localStorage.getItem("cameraLayout");
+  //     console.log("savedLayout", savedLayout);
+  //     if (savedLayout) {
+  //       const parsedLayout = JSON.parse(savedLayout);
+  //       console.log("Remove duma:");
 
-  React.useEffect(() => {
-    handleLoadLayout();
-  }, []);
+  //       setCameras(parsedLayout);
+  //       const maxId = Math.max(
+  //         ...parsedLayout.map((cam: Camera) => parseInt(cam.i.split("-")[1]))
+  //       );
+  //       setNextCameraId(maxId + 1);
+  //     }
+  //   };
+
+  //   React.useEffect(() => {
+  //     handleLoadLayout();
+  //   }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">

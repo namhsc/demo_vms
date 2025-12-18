@@ -1,11 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Settings, X, Play, Pause, Maximize, Minimize2 } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Settings, X, Play, Pause, Maximize } from "lucide-react";
+import {
+  createStream,
+  VIEWER_PASS,
+  VIEWER_USER,
+} from "../../services/streamService";
 
 interface CameraFeedProps {
   id: string;
   name: string;
   onRemove: (id: string) => void;
-  url?: string;
+  url: string;
 }
 
 // Generate a random pattern for mock video feed
@@ -64,7 +69,27 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
   const [scaleZoom, setScaleZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const panStart = useRef({ x: 0, y: 0 });
+  const [whepUrl, setWhepUrl] = useState("");
+
+  useEffect(() => {
+    if (!url) return;
+
+    createStream(url)
+      .then((data) => {
+        if (data && data.whepUrl) {
+          setWhepUrl(data.whepUrl);
+        } else {
+          setWhepUrl("");
+        }
+      })
+      .catch(() => {
+        console.error("Stream error → retry in 5s");
+        setTimeout(
+          () => createStream(url).then((d) => setWhepUrl(d.whepUrl)),
+          5000
+        );
+      });
+  }, [url]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -74,7 +99,6 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Listen for fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -124,10 +148,12 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
   const videoRef = useRef(null);
 
   useEffect(() => {
-    if (!url) return;
+    if (!whepUrl) return;
 
     const video = videoRef.current as any;
-    const pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection({
+      iceServers: [],
+    });
 
     if (!video) {
       console.error("Video element not found");
@@ -135,7 +161,7 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
     }
     // Khi nhận được track từ MediaMTX → hiển thị lên video
     pc.ontrack = (event) => {
-      console.log("Receiving track from MediaMTX", event);
+      console.log("✔ Track received");
       video.srcObject = event.streams[0];
     };
 
@@ -147,34 +173,57 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
     };
 
     // Bắt đầu WebRTC
-    const start = async () => {
+    const startWebRTC = async () => {
       try {
-        const offer = await pc.createOffer({ offerToReceiveVideo: true });
+        const offer = await pc.createOffer({
+          offerToReceiveVideo: true,
+          offerToReceiveAudio: true,
+        });
         await pc.setLocalDescription(offer);
 
-        // Gọi tới endpoint WHEP của MediaMTX
-        const res = await fetch(url, {
+        const authHeader = "Basic " + btoa(`${VIEWER_USER}:${VIEWER_PASS}`);
+
+        const response = await fetch(whepUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/sdp" },
-          body: offer.sdp,
+          headers: {
+            "Content-Type": "application/sdp",
+            Authorization: authHeader,
+          },
+          body: offer.sdp || "",
         });
 
-        const answer = await res.text();
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`WHEP failed (${response.status}): ${text}`);
+        }
 
-        await pc.setRemoteDescription({ type: "answer", sdp: answer });
+        const answerSDP = await response.text();
 
-        console.log("WebRTC connected:", url);
+        await pc.setRemoteDescription({ type: "answer", sdp: answerSDP });
+
+        console.log("WebRTC connected:", whepUrl);
       } catch (err) {
         console.error("WebRTC error:", err);
       }
     };
 
-    start();
+    let retryTimer: any;
 
+    const connect = async () => {
+      try {
+        await startWebRTC();
+      } catch (err) {
+        console.error("WebRTC failed, retry in 3s...");
+        retryTimer = setTimeout(connect, 3000); // auto reconnect
+      }
+    };
+
+    connect();
     return () => {
+      pc.getSenders().forEach((s) => s.track && s.track.stop());
       pc.close();
     };
-  }, [url]);
+  }, [whepUrl]);
 
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
@@ -227,7 +276,6 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
   };
 
   const handleMouseUp = () => setIsPanning(false);
-  const handleMouseLeave = () => setIsPanning(false);
 
   return (
     <div

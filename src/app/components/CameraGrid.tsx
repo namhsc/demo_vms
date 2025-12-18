@@ -1,16 +1,7 @@
 import GridLayout, { Layout } from "react-grid-layout";
 import { CameraFeed } from "./CameraFeed";
 import "react-grid-layout/css/styles.css";
-
-interface Camera {
-  i: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  name: string;
-  hidden?: boolean;
-}
+import { Camera } from "../App";
 
 interface CameraGridProps {
   cameras: Camera[];
@@ -35,40 +26,34 @@ export function CameraGrid({
       width={1200}
       autoSize={true}
       onLayoutChange={onLayoutChange}
-      gridConfig={{
-        cols: 12,
-        rowHeight: 150,
-      }}
+      gridConfig={{ cols: 12, rowHeight: 150 }}
       dragConfig={{
         handle: ".camera-header", // ✔ chỉ kéo khi người dùng nhấn vào header
         cancel: ".camera-content", // ✔ chặn kéo tại content (dùng để zoom/pan)
       }}
     >
-      {visibleCameras.map((camera) => (
-        <div
-          key={camera.i}
-          data-grid={{
-            x: camera.x,
-            y: camera.y,
-            w: camera.w,
-            h: camera.h,
-          }}
-          className="bg-slate-800 rounded-lg overflow-hidden"
-          style={{
-            boxShadow:
-              "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-          }}
-        >
-          <div className="drag-handle cursor-move h-full">
-            <CameraFeed
-              id={camera.i}
-              name={camera.name}
-              onRemove={onRemoveCamera}
-              url={"http://192.168.17.43:8889/cam1/whep"}
-            />
+      {visibleCameras.map((camera) => {
+        return (
+          <div
+            key={camera.i}
+            data-grid={{ x: camera.x, y: camera.y, w: camera.w, h: camera.h }}
+            className="bg-slate-800 rounded-lg overflow-hidden"
+            style={{
+              boxShadow:
+                "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+            }}
+          >
+            <div className="drag-handle cursor-move h-full">
+              <CameraFeed
+                id={camera.i}
+                name={camera.name}
+                onRemove={onRemoveCamera}
+                url={camera.url}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </GridLayout>
   );
 }
