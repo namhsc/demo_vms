@@ -152,16 +152,36 @@ export function PlaybackFeed({
 
 	return (
 		<div
-			className={`flex flex-col h-full bg-slate-900 rounded-lg overflow-hidden shadow-xl relative ${
-				isActive ? 'ring-2 ring-blue-500' : ''
+			className={`flex flex-col h-full bg-slate-900 rounded-lg overflow-hidden relative transition-all duration-300 ${
+				isActive
+					? 'ring-4 ring-blue-500 ring-offset-2 ring-offset-slate-900 shadow-2xl shadow-blue-500/50 scale-[1.02] z-10'
+					: 'shadow-xl'
 			}`}
 			ref={containerRef}
 		>
 			{/* Camera Header */}
-			<div className="camera-header z-10 flex items-center justify-between px-3 py-2 bg-slate-800 border-b border-slate-700">
+			<div
+				className={`camera-header z-10 flex items-center justify-between px-3 py-2 border-b transition-colors ${
+					isActive
+						? 'bg-blue-700/40 border-blue-400 shadow-inner'
+						: 'bg-slate-700 border-slate-600'
+				}`}
+			>
 				<div className="flex items-center gap-2">
-					<div className="w-2 h-2 rounded-full bg-blue-500" />
-					<span className="text-sm text-white">{name}</span>
+					<div
+						className={`w-2.5 h-2.5 rounded-full transition-all ${
+							isActive
+								? 'bg-blue-300 animate-pulse shadow-md shadow-blue-300/70'
+								: 'bg-blue-400'
+						}`}
+					/>
+					<span
+						className={`text-sm font-medium transition-colors ${
+							isActive ? 'text-blue-100 font-semibold' : 'text-slate-100'
+						}`}
+					>
+						{name}
+					</span>
 				</div>
 				<div className="flex items-center gap-1">
 					<button
@@ -220,7 +240,7 @@ export function PlaybackFeed({
 
 				{/* Active indicator */}
 				{isActive && (
-					<div className="absolute top-2 left-2 bg-blue-600 px-2 py-1 rounded text-xs text-white font-semibold">
+					<div className="absolute top-2 left-2 bg-blue-600 px-2 py-1 rounded text-xs text-white font-semibold shadow-lg z-20">
 						Đang chọn
 					</div>
 				)}

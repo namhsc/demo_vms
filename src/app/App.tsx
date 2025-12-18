@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Layout } from "react-grid-layout";
 
-export interface Camera {
+interface Camera {
   i: string;
   x: number;
   y: number;
@@ -21,74 +21,9 @@ export interface Camera {
   h: number;
   name: string;
   hidden?: boolean;
-  url: string;
 }
-
-const urlList = [
-  "rtsp://admin:AdminCam@192.168.16.239:554/Streaming/Channels/101?transportmode=unicast&profile=Profile_1",
-  "rtsp://admin:123456a@@27.72.146.175:1055/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif",
-];
-
-export function getRandomItem<T>(list: T[]): T {
-  const index = Math.floor(Math.random() * list.length);
-  return list[index];
-}
-
-const listLayoutDefault: Camera[] = [
-  {
-    i: "cam-1",
-    x: 0,
-    y: 0,
-    w: 4,
-    h: 2,
-    name: "Camera 1 - Entrance",
-    hidden: false,
-    url: getRandomItem(urlList),
-  },
-  {
-    i: "cam-2",
-    x: 4,
-    y: 0,
-    w: 4,
-    h: 2,
-    name: "Camera 2 - Parking Lot",
-    hidden: false,
-    url: getRandomItem(urlList),
-  },
-  {
-    i: "cam-3",
-    x: 8,
-    y: 0,
-    w: 4,
-    h: 2,
-    name: "Camera 3 - Lobby",
-    hidden: false,
-    url: getRandomItem(urlList),
-  },
-  {
-    i: "cam-4",
-    x: 0,
-    y: 2,
-    w: 6,
-    h: 2,
-    name: "Camera 4 - Office Area",
-    hidden: false,
-    url: getRandomItem(urlList),
-  },
-  {
-    i: "cam-5",
-    x: 6,
-    y: 2,
-    w: 6,
-    h: 2,
-    name: "Camera 5 - Warehouse",
-    hidden: false,
-    url: getRandomItem(urlList),
-  },
-];
 
 function App() {
-  const [cameras, setCameras] = useState<Camera[]>(listLayoutDefault);
   const [viewMode, setViewMode] = useState<"liveview" | "playback">("liveview");
   const [activePlaybackCamera, setActivePlaybackCamera] = useState<
     string | null
@@ -106,6 +41,53 @@ function App() {
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [viewStart, setViewStart] = useState(0);
   const [viewEnd, setViewEnd] = useState(3600);
+  const [cameras, setCameras] = useState<Camera[]>([
+    {
+      i: "cam-1",
+      x: 0,
+      y: 0,
+      w: 4,
+      h: 2,
+      name: "Camera 1 - Entrance",
+      hidden: false,
+    },
+    {
+      i: "cam-2",
+      x: 4,
+      y: 0,
+      w: 4,
+      h: 2,
+      name: "Camera 2 - Parking Lot",
+      hidden: false,
+    },
+    {
+      i: "cam-3",
+      x: 8,
+      y: 0,
+      w: 4,
+      h: 2,
+      name: "Camera 3 - Lobby",
+      hidden: false,
+    },
+    {
+      i: "cam-4",
+      x: 0,
+      y: 2,
+      w: 6,
+      h: 2,
+      name: "Camera 4 - Office Area",
+      hidden: false,
+    },
+    {
+      i: "cam-5",
+      x: 6,
+      y: 2,
+      w: 6,
+      h: 2,
+      name: "Camera 5 - Warehouse",
+      hidden: false,
+    },
+  ]);
 
   const [nextCameraId, setNextCameraId] = useState(6);
 
@@ -140,7 +122,53 @@ function App() {
   };
 
   const handleResetLayout = () => {
-    setCameras(listLayoutDefault);
+    setCameras([
+      {
+        i: "cam-1",
+        x: 0,
+        y: 0,
+        w: 4,
+        h: 2,
+        name: "Camera 1 - Entrance",
+        hidden: false,
+      },
+      {
+        i: "cam-2",
+        x: 4,
+        y: 0,
+        w: 4,
+        h: 2,
+        name: "Camera 2 - Parking Lot",
+        hidden: false,
+      },
+      {
+        i: "cam-3",
+        x: 8,
+        y: 0,
+        w: 4,
+        h: 2,
+        name: "Camera 3 - Lobby",
+        hidden: false,
+      },
+      {
+        i: "cam-4",
+        x: 0,
+        y: 2,
+        w: 6,
+        h: 2,
+        name: "Camera 4 - Office Area",
+        hidden: false,
+      },
+      {
+        i: "cam-5",
+        x: 6,
+        y: 2,
+        w: 6,
+        h: 2,
+        name: "Camera 5 - Warehouse",
+        hidden: false,
+      },
+    ]);
     setNextCameraId(6);
   };
 
@@ -206,9 +234,9 @@ function App() {
                 <Video className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl text-white">Camera Management System</h1>
+                <h1 className="text-xl text-white">Hệ thống quản lý camera</h1>
                 <p className="text-sm text-slate-400">
-                  Monitor and manage multiple camera feeds
+                  Hệ thống quản lý camera thông minh
                 </p>
               </div>
             </div>
@@ -219,7 +247,7 @@ function App() {
                 className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors shadow-lg"
               >
                 <RotateCcw className="w-4 h-4" />
-                Reset
+                Quay lại mặc định
               </button>
             </div>
           </div>
