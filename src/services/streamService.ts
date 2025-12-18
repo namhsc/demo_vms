@@ -11,7 +11,8 @@ export const VIEWER_PASS = "viewer123"; // pass read
 export const createStream = async (inputUrl: string) => {
   try {
     const response = await axios.post(
-      `http://${MTX_HOST}:${PORT}/api/streams`,
+      // `http://${MTX_HOST}:${PORT}/api/streams`,
+      `/api/streams`,
       {
         inputUrl,
         onDemand: true,
