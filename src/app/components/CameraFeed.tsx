@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, use } from "react";
 import {
   Settings,
   X,
@@ -19,6 +19,11 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import {
+  createStream,
+  VIEWER_PASS,
+  VIEWER_USER,
+} from "../../services/streamService";
 
 interface CameraFeedProps {
   id: string;
@@ -85,15 +90,15 @@ export function LiveviewFeed({
   const [timestamp, setTimestamp] = useState(new Date());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [rtspUrl, setRtspUrl] = useState("");
-  const [currentUrl, setCurrentUrl] = useState(initialUrl || "");
+  const [rtspUrl, setRtspUrl] = useState(initialUrl || "");
+  const [rtspUrlInput, setRtspUrlInput] = useState(initialUrl || "");
+  const [currentUrl, setCurrentUrl] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const lastPos = useRef({ x: 0, y: 0 });
   const videoContentRef = useRef<HTMLDivElement>(null);
   const [scaleZoom, setScaleZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const panStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -151,73 +156,80 @@ export function LiveviewFeed({
   };
 
   const videoRef = useRef(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
+  // const pcRef = useRef<RTCPeerConnection | null>(null);
 
   // Update URL when initialUrl changes
   useEffect(() => {
     if (initialUrl) {
-      setCurrentUrl(initialUrl);
+      setRtspUrl(initialUrl);
     }
   }, [initialUrl]);
 
-  const handleApplySettings = () => {
+  useEffect(() => {
     if (!rtspUrl || rtspUrl.trim() === "") {
       return;
     }
 
-    // Convert RTSP URL to WHEP endpoint
-    // Ví dụ: rtsp://192.168.1.100:554/stream -> http://192.168.1.100:8889/cam1/whep
     try {
       const rtspMatch = rtspUrl.match(/rtsp:\/\/([^\/]+)(\/.*)?/);
       if (rtspMatch) {
-        const host = rtspMatch[1];
-        const path = rtspMatch[2] || "/stream";
-        // Giả sử WHEP server chạy trên cùng host với port 8889
-        const hostParts = host.split(":");
-        const ip = hostParts[0];
-        // Extract camera name from path or use default
-        const cameraName =
-          path
-            .split("/")
-            .filter((p) => p)
-            .pop() || "cam1";
-        const newUrl = `http://${ip}:8889/${cameraName}/whep`;
+        setIsSettingsOpen(false);
 
-        if (newUrl !== currentUrl) {
-          setCurrentUrl(newUrl);
-          setIsSettingsOpen(false);
-          setIsLive(true);
-        }
+        createStream(rtspUrl)
+          .then((data) => {
+            if (data && data.whepUrl) {
+              setCurrentUrl(data.whepUrl);
+              setIsSettingsOpen(false);
+            } else {
+              setCurrentUrl("");
+              console.error("Lỗi tạo link stream");
+            }
+          })
+          .catch(() => {
+            setTimeout(
+              () =>
+                createStream(rtspUrl)
+                  .then((d) => {
+                    if (d && d.whepUrl) {
+                      setCurrentUrl(d.whepUrl);
+                      setIsSettingsOpen(false);
+                    } else {
+                      setCurrentUrl("");
+                      console.error("Lỗi tạo link stream");
+                    }
+                  })
+                  .catch(() => setCurrentUrl("")),
+              5000
+            );
+          });
       } else {
         console.error("Invalid RTSP URL format");
       }
     } catch (err) {
       console.error("Error converting RTSP URL:", err);
     }
+  }, [rtspUrl]);
+
+  const handleApplySettings = () => {
+    console.log("rtspUrlInput", rtspUrlInput);
+    setRtspUrl(rtspUrlInput);
   };
 
   useEffect(() => {
     if (!currentUrl) return;
-
+    console.log("currentUrl", currentUrl);
     const video = videoRef.current as any;
-
-    // Close previous connection if exists
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
-    }
-
-    const pc = new RTCPeerConnection();
-    pcRef.current = pc;
+    const pc = new RTCPeerConnection({
+      iceServers: [],
+    });
 
     if (!video) {
       console.error("Video element not found");
       return;
     }
-
     // Khi nhận được track từ MediaMTX → hiển thị lên video
     pc.ontrack = (event) => {
-      console.log("Receiving track from MediaMTX", event);
+      console.log("✔ Track received");
       video.srcObject = event.streams[0];
       setIsLive(true);
     };
@@ -229,53 +241,56 @@ export function LiveviewFeed({
       }
     };
 
-    // Error handling
-    pc.onconnectionstatechange = () => {
-      console.log("Connection state:", pc.connectionState);
-      if (
-        pc.connectionState === "failed" ||
-        pc.connectionState === "disconnected"
-      ) {
-        setIsLive(false);
-      }
-    };
-
     // Bắt đầu WebRTC
-    const start = async () => {
+    const startWebRTC = async () => {
       try {
-        const offer = await pc.createOffer({ offerToReceiveVideo: true });
+        const offer = await pc.createOffer({
+          offerToReceiveVideo: true,
+          offerToReceiveAudio: true,
+        });
         await pc.setLocalDescription(offer);
 
-        // Gọi tới endpoint WHEP của MediaMTX
-        const res = await fetch(currentUrl, {
+        const authHeader = "Basic " + btoa(`${VIEWER_USER}:${VIEWER_PASS}`);
+
+        const response = await fetch(currentUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/sdp" },
-          body: offer.sdp,
+          headers: {
+            "Content-Type": "application/sdp",
+            Authorization: authHeader,
+          },
+          body: offer.sdp || "",
         });
 
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`WHEP failed (${response.status}): ${text}`);
         }
 
-        const answer = await res.text();
+        const answerSDP = await response.text();
 
-        await pc.setRemoteDescription({ type: "answer", sdp: answer });
+        await pc.setRemoteDescription({ type: "answer", sdp: answerSDP });
 
         console.log("WebRTC connected:", currentUrl);
-        setIsLive(true);
       } catch (err) {
         console.error("WebRTC error:", err);
-        setIsLive(false);
       }
     };
 
-    start();
+    let retryTimer: any;
 
-    return () => {
-      if (pcRef.current) {
-        pcRef.current.close();
-        pcRef.current = null;
+    const connect = async () => {
+      try {
+        await startWebRTC();
+      } catch (err) {
+        console.error("WebRTC failed, retry in 3s...");
+        retryTimer = setTimeout(connect, 3000); // auto reconnect
       }
+    };
+
+    connect();
+    return () => {
+      pc.getSenders().forEach((s) => s.track && s.track.stop());
+      pc.close();
     };
   }, [currentUrl]);
 
@@ -330,7 +345,6 @@ export function LiveviewFeed({
   };
 
   const handleMouseUp = () => setIsPanning(false);
-  const handleMouseLeave = () => setIsPanning(false);
 
   return (
     <div
@@ -510,8 +524,8 @@ export function LiveviewFeed({
                 id="rtsp-url"
                 type="text"
                 placeholder="Nhập đường dẫn RTSP"
-                value={rtspUrl}
-                onChange={(e) => setRtspUrl(e.target.value)}
+                value={rtspUrlInput}
+                onChange={(e) => setRtspUrlInput(e.target.value)}
                 className="bg-slate-700 text-white border-slate-600 focus:border-blue-500"
               />
             </div>

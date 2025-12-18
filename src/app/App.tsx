@@ -2,18 +2,11 @@ import React, { useState, useEffect } from "react";
 import { CameraGrid } from "./components/CameraGrid";
 import { CameraList } from "./components/CameraList";
 import { PlaybackControls } from "./components/PlaybackControls";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
-import {
-  Grid3x3,
-  RotateCcw,
-  Settings,
-  Video,
-  Radio,
-  History,
-} from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { Grid3x3, RotateCcw, Video, Radio, History } from "lucide-react";
 import { Layout } from "react-grid-layout";
 
-interface Camera {
+export interface Camera {
   i: string;
   x: number;
   y: number;
@@ -21,7 +14,29 @@ interface Camera {
   h: number;
   name: string;
   hidden?: boolean;
+  url?: string;
 }
+
+const layoutDefault: Camera[] = [
+  {
+    i: "cam-1",
+    x: 0,
+    y: 0,
+    w: 4,
+    h: 2,
+    name: "Camera 1 - Entrance",
+    hidden: false,
+  },
+  {
+    i: "cam-2",
+    x: 4,
+    y: 0,
+    w: 4,
+    h: 2,
+    name: "Camera 2 - Parking Lot",
+    hidden: false,
+  },
+];
 
 function App() {
   const [viewMode, setViewMode] = useState<"liveview" | "playback">("liveview");
@@ -41,53 +56,7 @@ function App() {
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [viewStart, setViewStart] = useState(0);
   const [viewEnd, setViewEnd] = useState(3600);
-  const [cameras, setCameras] = useState<Camera[]>([
-    {
-      i: "cam-1",
-      x: 0,
-      y: 0,
-      w: 4,
-      h: 2,
-      name: "Camera 1 - Entrance",
-      hidden: false,
-    },
-    {
-      i: "cam-2",
-      x: 4,
-      y: 0,
-      w: 4,
-      h: 2,
-      name: "Camera 2 - Parking Lot",
-      hidden: false,
-    },
-    {
-      i: "cam-3",
-      x: 8,
-      y: 0,
-      w: 4,
-      h: 2,
-      name: "Camera 3 - Lobby",
-      hidden: false,
-    },
-    {
-      i: "cam-4",
-      x: 0,
-      y: 2,
-      w: 6,
-      h: 2,
-      name: "Camera 4 - Office Area",
-      hidden: false,
-    },
-    {
-      i: "cam-5",
-      x: 6,
-      y: 2,
-      w: 6,
-      h: 2,
-      name: "Camera 5 - Warehouse",
-      hidden: false,
-    },
-  ]);
+  const [cameras, setCameras] = useState<Camera[]>(layoutDefault);
 
   const [nextCameraId, setNextCameraId] = useState(6);
 
@@ -122,53 +91,7 @@ function App() {
   };
 
   const handleResetLayout = () => {
-    setCameras([
-      {
-        i: "cam-1",
-        x: 0,
-        y: 0,
-        w: 4,
-        h: 2,
-        name: "Camera 1 - Entrance",
-        hidden: false,
-      },
-      {
-        i: "cam-2",
-        x: 4,
-        y: 0,
-        w: 4,
-        h: 2,
-        name: "Camera 2 - Parking Lot",
-        hidden: false,
-      },
-      {
-        i: "cam-3",
-        x: 8,
-        y: 0,
-        w: 4,
-        h: 2,
-        name: "Camera 3 - Lobby",
-        hidden: false,
-      },
-      {
-        i: "cam-4",
-        x: 0,
-        y: 2,
-        w: 6,
-        h: 2,
-        name: "Camera 4 - Office Area",
-        hidden: false,
-      },
-      {
-        i: "cam-5",
-        x: 6,
-        y: 2,
-        w: 6,
-        h: 2,
-        name: "Camera 5 - Warehouse",
-        hidden: false,
-      },
-    ]);
+    setCameras(layoutDefault);
     setNextCameraId(6);
   };
 
