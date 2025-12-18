@@ -1,5 +1,6 @@
 import GridLayout, { Layout } from "react-grid-layout";
-import { CameraFeed } from "./CameraFeed";
+import { LiveviewFeed } from "./CameraFeed";
+import { PlaybackFeed } from "./PlaybackFeed";
 import "react-grid-layout/css/styles.css";
 
 interface Camera {
@@ -16,6 +17,14 @@ interface CameraGridProps {
   cameras: Camera[];
   onLayoutChange: (layout: Layout) => void;
   onRemoveCamera: (id: string) => void;
+  onToggleCamera?: (id: string) => void;
+  onSelectCamera?: (id: string) => void;
+  activeCameraId?: string | null;
+  playbackState?: {
+    isPlaying: boolean;
+    currentTime: number;
+  };
+  mode?: "liveview" | "playback";
   cols?: number;
   rowHeight?: number;
 }
@@ -24,6 +33,11 @@ export function CameraGrid({
   cameras,
   onLayoutChange,
   onRemoveCamera,
+  onToggleCamera,
+  onSelectCamera,
+  activeCameraId,
+  playbackState,
+  mode = "liveview",
 }: CameraGridProps) {
   // Filter out hidden cameras
   const visibleCameras = cameras.filter((camera) => !camera.hidden);
@@ -60,12 +74,26 @@ export function CameraGrid({
           }}
         >
           <div className="drag-handle cursor-move h-full">
-            <CameraFeed
-              id={camera.i}
-              name={camera.name}
-              onRemove={onRemoveCamera}
-              url={"http://192.168.17.43:8889/cam1/whep"}
-            />
+            {mode === "liveview" ? (
+              <LiveviewFeed
+                id={camera.i}
+                name={camera.name}
+                onRemove={onRemoveCamera}
+                onHide={onToggleCamera}
+                url={"http://192.168.17.43:8889/cam1/whep"}
+              />
+            ) : (
+              <PlaybackFeed
+                id={camera.i}
+                name={camera.name}
+                onRemove={onRemoveCamera}
+                onSelect={onSelectCamera}
+                isActive={activeCameraId === camera.i}
+                currentTime={playbackState?.currentTime}
+                isPlaying={playbackState?.isPlaying}
+                url={"http://192.168.17.43:8889/cam1/whep"}
+              />
+            )}
           </div>
         </div>
       ))}

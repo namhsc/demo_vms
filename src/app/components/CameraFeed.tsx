@@ -1,381 +1,567 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Settings, X, Play, Pause, Maximize, Minimize2 } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+	Settings,
+	X,
+	Play,
+	Pause,
+	Maximize,
+	Minimize2,
+	Save,
+} from 'lucide-react';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 
 interface CameraFeedProps {
-  id: string;
-  name: string;
-  onRemove: (id: string) => void;
-  url?: string;
+	id: string;
+	name: string;
+	onRemove: (id: string) => void;
+	onHide?: (id: string) => void;
+	url?: string;
 }
 
 // Generate a random pattern for mock video feed
 const generatePattern = () => {
-  const canvas = document.createElement("canvas");
-  canvas.width = 640;
-  canvas.height = 480;
-  const ctx = canvas.getContext("2d");
+	const canvas = document.createElement('canvas');
+	canvas.width = 640;
+	canvas.height = 480;
+	const ctx = canvas.getContext('2d');
 
-  if (ctx) {
-    // Create gradient background
-    const gradient = ctx.createLinearGradient(
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-    gradient.addColorStop(0, "#1e293b");
-    gradient.addColorStop(1, "#334155");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+	if (ctx) {
+		// Create gradient background
+		const gradient = ctx.createLinearGradient(
+			0,
+			0,
+			canvas.width,
+			canvas.height,
+		);
+		gradient.addColorStop(0, '#1e293b');
+		gradient.addColorStop(1, '#334155');
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Add grid pattern
-    ctx.strokeStyle = "#475569";
-    ctx.lineWidth = 1;
-    for (let i = 0; i < canvas.width; i += 40) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, canvas.height);
-      ctx.stroke();
-    }
-    for (let i = 0; i < canvas.height; i += 40) {
-      ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(canvas.width, i);
-      ctx.stroke();
-    }
+		// Add grid pattern
+		ctx.strokeStyle = '#475569';
+		ctx.lineWidth = 1;
+		for (let i = 0; i < canvas.width; i += 40) {
+			ctx.beginPath();
+			ctx.moveTo(i, 0);
+			ctx.lineTo(i, canvas.height);
+			ctx.stroke();
+		}
+		for (let i = 0; i < canvas.height; i += 40) {
+			ctx.beginPath();
+			ctx.moveTo(0, i);
+			ctx.lineTo(canvas.width, i);
+			ctx.stroke();
+		}
 
-    return canvas.toDataURL();
-  }
-  return "";
+		return canvas.toDataURL();
+	}
+	return '';
 };
 
 const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
+	Math.min(Math.max(value, min), max);
 
-export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
-  const [isLive, setIsLive] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
-  const [showControls, setShowControls] = useState(false);
-  const [timestamp, setTimestamp] = useState(new Date());
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const lastPos = useRef({ x: 0, y: 0 });
-  const videoContentRef = useRef<HTMLDivElement>(null);
-  const [scaleZoom, setScaleZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const panStart = useRef({ x: 0, y: 0 });
+export function LiveviewFeed({
+	id,
+	name,
+	onRemove,
+	onHide,
+	url: initialUrl,
+}: CameraFeedProps) {
+	const [isLive, setIsLive] = useState(true);
+	const [isPaused, setIsPaused] = useState(false);
+	const [showControls, setShowControls] = useState(false);
+	const [timestamp, setTimestamp] = useState(new Date());
+	const [isFullscreen, setIsFullscreen] = useState(false);
+	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+	const [rtspUrl, setRtspUrl] = useState('');
+	const [whepUrl, setWhepUrl] = useState(initialUrl || '');
+	const [currentUrl, setCurrentUrl] = useState(initialUrl || '');
+	const containerRef = useRef<HTMLDivElement>(null);
+	const lastPos = useRef({ x: 0, y: 0 });
+	const videoContentRef = useRef<HTMLDivElement>(null);
+	const [scaleZoom, setScaleZoom] = useState(1);
+	const [offset, setOffset] = useState({ x: 0, y: 0 });
+	const [isPanning, setIsPanning] = useState(false);
+	const panStart = useRef({ x: 0, y: 0 });
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimestamp(new Date());
-    }, 1000);
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setTimestamp(new Date());
+		}, 1000);
 
-    return () => clearInterval(interval);
-  }, []);
+		return () => clearInterval(interval);
+	}, []);
 
-  // Listen for fullscreen changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-      if (document.fullscreenElement) {
-        setShowControls(true);
-      }
-    };
+	// Listen for fullscreen changes
+	useEffect(() => {
+		const handleFullscreenChange = () => {
+			setIsFullscreen(!!document.fullscreenElement);
+			if (document.fullscreenElement) {
+				setShowControls(true);
+			}
+		};
 
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
-    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+		document.addEventListener('fullscreenchange', handleFullscreenChange);
+		document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+		document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+		document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener(
-        "webkitfullscreenchange",
-        handleFullscreenChange
-      );
-      document.removeEventListener(
-        "mozfullscreenchange",
-        handleFullscreenChange
-      );
-      document.removeEventListener(
-        "MSFullscreenChange",
-        handleFullscreenChange
-      );
-    };
-  }, []);
+		return () => {
+			document.removeEventListener('fullscreenchange', handleFullscreenChange);
+			document.removeEventListener(
+				'webkitfullscreenchange',
+				handleFullscreenChange,
+			);
+			document.removeEventListener(
+				'mozfullscreenchange',
+				handleFullscreenChange,
+			);
+			document.removeEventListener(
+				'MSFullscreenChange',
+				handleFullscreenChange,
+			);
+		};
+	}, []);
 
-  const toggleFullscreen = () => {
-    const element = containerRef.current;
+	const toggleFullscreen = () => {
+		const element = containerRef.current;
 
-    if (!element) return;
+		if (!element) return;
 
-    // Nếu chưa fullscreen → mở
-    if (!document.fullscreenElement) {
-      element.requestFullscreen?.();
-      setIsFullscreen(true);
-    } else {
-      // Nếu đang fullscreen → thoát
-      document.exitFullscreen?.();
-      setIsFullscreen(false);
-    }
-  };
+		// Nếu chưa fullscreen → mở
+		if (!document.fullscreenElement) {
+			element.requestFullscreen?.();
+			setIsFullscreen(true);
+		} else {
+			// Nếu đang fullscreen → thoát
+			document.exitFullscreen?.();
+			setIsFullscreen(false);
+		}
+	};
 
-  const videoRef = useRef(null);
+	const videoRef = useRef(null);
+	const pcRef = useRef<RTCPeerConnection | null>(null);
 
-  useEffect(() => {
-    if (!url) return;
+	// Update URL when initialUrl changes
+	useEffect(() => {
+		if (initialUrl) {
+			setCurrentUrl(initialUrl);
+			setWhepUrl(initialUrl);
+		}
+	}, [initialUrl]);
 
-    const video = videoRef.current as any;
-    const pc = new RTCPeerConnection();
+	const handleApplySettings = () => {
+		// Nếu có RTSP URL, convert thành WHEP endpoint
+		// Giả sử backend sẽ xử lý conversion từ RTSP -> WHEP
+		// Hoặc người dùng có thể nhập WHEP endpoint trực tiếp
+		let newUrl = whepUrl;
 
-    if (!video) {
-      console.error("Video element not found");
-      return;
-    }
-    // Khi nhận được track từ MediaMTX → hiển thị lên video
-    pc.ontrack = (event) => {
-      console.log("Receiving track from MediaMTX", event);
-      video.srcObject = event.streams[0];
-    };
+		if (rtspUrl && rtspUrl.trim() !== '') {
+			// Convert RTSP URL to WHEP endpoint
+			// Ví dụ: rtsp://192.168.1.100:554/stream -> http://192.168.1.100:8889/cam1/whep
+			// Hoặc có thể gọi API để convert
+			try {
+				const rtspMatch = rtspUrl.match(/rtsp:\/\/([^\/]+)(\/.*)?/);
+				if (rtspMatch) {
+					const host = rtspMatch[1];
+					const path = rtspMatch[2] || '/stream';
+					// Giả sử WHEP server chạy trên cùng host với port 8889
+					const hostParts = host.split(':');
+					const ip = hostParts[0];
+					// Extract camera name from path or use default
+					const cameraName =
+						path
+							.split('/')
+							.filter((p) => p)
+							.pop() || 'cam1';
+					newUrl = `http://${ip}:8889/${cameraName}/whep`;
+				}
+			} catch (err) {
+				console.error('Error converting RTSP URL:', err);
+				// Nếu không convert được, sử dụng WHEP URL trực tiếp
+			}
+		}
 
-    // Debug ICE (không cần gửi ICE lên MediaMTX)
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        console.log("New ICE candidate:", event.candidate);
-      }
-    };
+		if (newUrl && newUrl !== currentUrl) {
+			setCurrentUrl(newUrl);
+			setIsSettingsOpen(false);
+			setIsLive(true);
+		}
+	};
 
-    // Bắt đầu WebRTC
-    const start = async () => {
-      try {
-        const offer = await pc.createOffer({ offerToReceiveVideo: true });
-        await pc.setLocalDescription(offer);
+	useEffect(() => {
+		if (!currentUrl) return;
 
-        // Gọi tới endpoint WHEP của MediaMTX
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/sdp" },
-          body: offer.sdp,
-        });
+		const video = videoRef.current as any;
 
-        const answer = await res.text();
+		// Close previous connection if exists
+		if (pcRef.current) {
+			pcRef.current.close();
+			pcRef.current = null;
+		}
 
-        await pc.setRemoteDescription({ type: "answer", sdp: answer });
+		const pc = new RTCPeerConnection();
+		pcRef.current = pc;
 
-        console.log("WebRTC connected:", url);
-      } catch (err) {
-        console.error("WebRTC error:", err);
-      }
-    };
+		if (!video) {
+			console.error('Video element not found');
+			return;
+		}
 
-    start();
+		// Khi nhận được track từ MediaMTX → hiển thị lên video
+		pc.ontrack = (event) => {
+			console.log('Receiving track from MediaMTX', event);
+			video.srcObject = event.streams[0];
+			setIsLive(true);
+		};
 
-    return () => {
-      pc.close();
-    };
-  }, [url]);
+		// Debug ICE (không cần gửi ICE lên MediaMTX)
+		pc.onicecandidate = (event) => {
+			if (event.candidate) {
+				console.log('New ICE candidate:', event.candidate);
+			}
+		};
 
-  const handleWheel = (e: WheelEvent) => {
-    e.preventDefault();
+		// Error handling
+		pc.onconnectionstatechange = () => {
+			console.log('Connection state:', pc.connectionState);
+			if (
+				pc.connectionState === 'failed' ||
+				pc.connectionState === 'disconnected'
+			) {
+				setIsLive(false);
+			}
+		};
 
-    let nextScale = scaleZoom + (e.deltaY > 0 ? -0.1 : 0.1);
-    nextScale = Math.min(Math.max(nextScale, 1), 5); // min 1 - max 5
+		// Bắt đầu WebRTC
+		const start = async () => {
+			try {
+				const offer = await pc.createOffer({ offerToReceiveVideo: true });
+				await pc.setLocalDescription(offer);
 
-    if (nextScale === 1) {
-      // Reset pan khi về mức zoom 1
-      setOffset({ x: 0, y: 0 });
-    }
+				// Gọi tới endpoint WHEP của MediaMTX
+				const res = await fetch(currentUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/sdp' },
+					body: offer.sdp,
+				});
 
-    setScaleZoom(nextScale);
-  };
+				if (!res.ok) {
+					throw new Error(`HTTP error! status: ${res.status}`);
+				}
 
-  useEffect(() => {
-    const div = videoContentRef.current;
-    if (!div) return;
+				const answer = await res.text();
 
-    div.addEventListener("wheel", handleWheel, { passive: false });
+				await pc.setRemoteDescription({ type: 'answer', sdp: answer });
 
-    return () => div.removeEventListener("wheel", handleWheel);
-  }, [handleWheel]);
+				console.log('WebRTC connected:', currentUrl);
+				setIsLive(true);
+			} catch (err) {
+				console.error('WebRTC error:', err);
+				setIsLive(false);
+			}
+		};
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (scaleZoom === 1) return; // không pan khi chưa zoom
-    setIsPanning(true);
-    lastPos.current = { x: e.clientX, y: e.clientY };
-  };
+		start();
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isPanning || !videoContentRef.current) return;
+		return () => {
+			if (pcRef.current) {
+				pcRef.current.close();
+				pcRef.current = null;
+			}
+		};
+	}, [currentUrl]);
 
-    const dx = e.clientX - lastPos.current.x;
-    const dy = e.clientY - lastPos.current.y;
+	const handleWheel = (e: WheelEvent) => {
+		e.preventDefault();
 
-    lastPos.current = { x: e.clientX, y: e.clientY };
+		let nextScale = scaleZoom + (e.deltaY > 0 ? -0.1 : 0.1);
+		nextScale = Math.min(Math.max(nextScale, 1), 5); // min 1 - max 5
 
-    const container = videoContentRef.current.getBoundingClientRect();
-    const videoW = container.width * scaleZoom;
-    const videoH = container.height * scaleZoom;
+		if (nextScale === 1) {
+			// Reset pan khi về mức zoom 1
+			setOffset({ x: 0, y: 0 });
+		}
 
-    const maxX = (videoW - container.width) / 2;
-    const maxY = (videoH - container.height) / 2;
+		setScaleZoom(nextScale);
+	};
 
-    setOffset((prev) => ({
-      x: clamp(prev.x + dx, -maxX, maxX),
-      y: clamp(prev.y + dy, -maxY, maxY),
-    }));
-  };
+	useEffect(() => {
+		const div = videoContentRef.current;
+		if (!div) return;
 
-  const handleMouseUp = () => setIsPanning(false);
-  const handleMouseLeave = () => setIsPanning(false);
+		div.addEventListener('wheel', handleWheel, { passive: false });
 
-  return (
-    <div
-      className="flex flex-col h-full bg-slate-900 rounded-lg overflow-hidden shadow-xl relative"
-      onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
-      ref={containerRef}
-    >
-      {/* Camera Header */}
-      <div
-        className={`camera-header z-10 flex items-center justify-between ${
-          isFullscreen ? "px-6 py-4" : "px-3 py-2"
-        } bg-slate-800 border-b border-slate-700`}
-      >
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              isLive ? "bg-red-500 animate-pulse" : "bg-gray-500"
-            } ${isFullscreen ? "w-3 h-3" : "w-2 h-2"}`}
-          />
-          <span className="text-sm text-white">{name}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            className="p-1 hover:bg-slate-700 rounded transition-colors"
-            title="Settings"
-          >
-            <Settings className="w-4 h-4 text-slate-300" />
-          </button>
-          <button
-            className="p-1 hover:bg-slate-700 rounded transition-colors"
-            onClick={() => onRemove(id)}
-            title="Remove Camera"
-          >
-            <X
-              className={`${
-                isFullscreen ? "w-6 h-6" : "w-4 h-4"
-              }  text-slate-300`}
-            />
-          </button>
-        </div>
-      </div>
-      {/* Camera Content */}
-      <div
-        className="camera-content flex-1 relative bg-slate-800"
-        ref={videoContentRef}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onMouseMove={(e) => handleMouseMove(e.nativeEvent)}
-      >
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{
-            transform: `
+		return () => div.removeEventListener('wheel', handleWheel);
+	}, [handleWheel]);
+
+	const handleMouseDown = (e: React.MouseEvent) => {
+		if (scaleZoom === 1) return; // không pan khi chưa zoom
+		setIsPanning(true);
+		lastPos.current = { x: e.clientX, y: e.clientY };
+	};
+
+	const handleMouseMove = (e: MouseEvent) => {
+		if (!isPanning || !videoContentRef.current) return;
+
+		const dx = e.clientX - lastPos.current.x;
+		const dy = e.clientY - lastPos.current.y;
+
+		lastPos.current = { x: e.clientX, y: e.clientY };
+
+		const container = videoContentRef.current.getBoundingClientRect();
+		const videoW = container.width * scaleZoom;
+		const videoH = container.height * scaleZoom;
+
+		const maxX = (videoW - container.width) / 2;
+		const maxY = (videoH - container.height) / 2;
+
+		setOffset((prev) => ({
+			x: clamp(prev.x + dx, -maxX, maxX),
+			y: clamp(prev.y + dy, -maxY, maxY),
+		}));
+	};
+
+	const handleMouseUp = () => setIsPanning(false);
+	const handleMouseLeave = () => setIsPanning(false);
+
+	return (
+		<div
+			className="flex flex-col h-full bg-slate-900 rounded-lg overflow-hidden shadow-xl relative"
+			onMouseEnter={() => setShowControls(true)}
+			onMouseLeave={() => setShowControls(false)}
+			ref={containerRef}
+		>
+			{/* Camera Header */}
+			<div
+				className={`camera-header z-10 flex items-center justify-between ${
+					isFullscreen ? 'px-6 py-4' : 'px-3 py-2'
+				} bg-slate-800 border-b border-slate-700`}
+			>
+				<div className="flex items-center gap-2">
+					<div
+						className={`w-2 h-2 rounded-full ${
+							isLive ? 'bg-red-500 animate-pulse' : 'bg-gray-500'
+						} ${isFullscreen ? 'w-3 h-3' : 'w-2 h-2'}`}
+					/>
+					<span className="text-sm text-white">{name}</span>
+				</div>
+				<div className="flex items-center gap-1">
+					<button
+						className="p-1 hover:bg-slate-700 rounded transition-colors"
+						title="Settings"
+						onClick={() => setIsSettingsOpen(true)}
+					>
+						<Settings className="w-4 h-4 text-slate-300" />
+					</button>
+					<button
+						className="p-1 hover:bg-slate-700 rounded transition-colors"
+						onClick={() => {
+							if (onHide) {
+								onHide(id);
+							} else {
+								onRemove(id);
+							}
+						}}
+						title={onHide ? 'Ẩn Camera' : 'Remove Camera'}
+					>
+						<X
+							className={`${
+								isFullscreen ? 'w-6 h-6' : 'w-4 h-4'
+							}  text-slate-300`}
+						/>
+					</button>
+				</div>
+			</div>
+			{/* Camera Content */}
+			<div
+				className="camera-content flex-1 relative bg-slate-800"
+				ref={videoContentRef}
+				onMouseDown={handleMouseDown}
+				onMouseUp={handleMouseUp}
+				onMouseLeave={handleMouseUp}
+				onMouseMove={(e) => handleMouseMove(e.nativeEvent)}
+			>
+				<div
+					className="absolute inset-0 flex items-center justify-center"
+					style={{
+						transform: `
       scale(${scaleZoom})
       translate(${offset.x / scaleZoom}px, ${offset.y / scaleZoom}px)
     `,
-            transformOrigin: "center center",
-            transition: isPanning ? "none" : "transform 0.15s ease-out",
-            cursor: scaleZoom > 1 ? "grab" : "default",
-          }}
-        >
-          <div className="absolute inset-0">
-            <img
-              src={generatePattern()}
-              alt={`Camera ${name}`}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          {/* <div className="absolute inset-0"> */}
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            controls={false}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "fill",
-              zIndex: 2,
-            }}
-          />
-          {/* </div> */}
-        </div>
+						transformOrigin: 'center center',
+						transition: isPanning ? 'none' : 'transform 0.15s ease-out',
+						cursor: scaleZoom > 1 ? 'grab' : 'default',
+					}}
+				>
+					<div className="absolute inset-0">
+						<img
+							src={generatePattern()}
+							alt={`Camera ${name}`}
+							className="w-full h-full object-cover"
+						/>
+					</div>
+					{/* <div className="absolute inset-0"> */}
+					<video
+						ref={videoRef}
+						autoPlay
+						playsInline
+						muted
+						controls={false}
+						style={{
+							width: '100%',
+							height: '100%',
+							objectFit: 'fill',
+							zIndex: 2,
+						}}
+					/>
+					{/* </div> */}
+				</div>
 
-        <div className="absolute inset-0 flex items-center justify-center">
-          {isLive ? (
-            <div className="w-full h-full relative">
-              {/* Top Overlay Info */}
-              <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-xs text-white">
-                {isPaused ? "PAUSED" : "LIVE"}
-              </div>
+				<div className="absolute inset-0 flex items-center justify-center">
+					{isLive ? (
+						<div className="w-full h-full relative">
+							{/* Top Overlay Info */}
+							<div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-xs text-white">
+								{isPaused ? 'PAUSED' : 'LIVE'}
+							</div>
 
-              {/* Bottom Info - Above Controls */}
-              <div
-                className={`absolute left-2 right-2 flex justify-between text-xs text-white font-mono transition-all ${
-                  showControls ? "bottom-14" : "bottom-2"
-                }`}
-              >
-                <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded">
-                  {timestamp.toLocaleTimeString()}
-                </div>
-              </div>
+							{/* Bottom Info - Above Controls */}
+							<div
+								className={`absolute left-2 right-2 flex justify-between text-xs text-white font-mono transition-all ${
+									showControls ? 'bottom-14' : 'bottom-2'
+								}`}
+							>
+								<div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded">
+									{timestamp.toLocaleTimeString()}
+								</div>
+							</div>
 
-              {/* Control Bar - Bottom Fixed */}
-              <div
-                className={`absolute bottom-0 left-0 right-0 transition-all duration-300 ${
-                  showControls
-                    ? "opacity-100 translate-y-0"
-                    : "opacity-0 translate-y-4"
-                }`}
-              >
-                <div className="bg-black/80 backdrop-blur-md px-4 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    {/* Left Controls - Play/Pause */}
-                    <button
-                      onClick={() => setIsPaused(!isPaused)}
-                      className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
-                      title={isPaused ? "Play" : "Pause"}
-                    >
-                      {isPaused ? (
-                        <Play className="w-4 h-4 text-white" fill="white" />
-                      ) : (
-                        <Pause className="w-4 h-4 text-white" fill="white" />
-                      )}
-                    </button>
+							{/* Control Bar - Bottom Fixed */}
+							<div
+								className={`absolute bottom-0 left-0 right-0 transition-all duration-300 ${
+									showControls
+										? 'opacity-100 translate-y-0'
+										: 'opacity-0 translate-y-4'
+								}`}
+							>
+								<div className="bg-black/80 backdrop-blur-md px-4 py-2.5">
+									<div className="flex items-center justify-between gap-2">
+										{/* Left Controls - Play/Pause */}
+										<button
+											onClick={() => setIsPaused(!isPaused)}
+											className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
+											title={isPaused ? 'Play' : 'Pause'}
+										>
+											{isPaused ? (
+												<Play className="w-4 h-4 text-white" fill="white" />
+											) : (
+												<Pause className="w-4 h-4 text-white" fill="white" />
+											)}
+										</button>
 
-                    {/* Right Controls - Fullscreen */}
-                    <button
-                      onClick={toggleFullscreen}
-                      className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
-                      title="Fullscreen"
-                    >
-                      <Maximize className="w-4 h-4 text-white" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-slate-500">
-              <span className="text-sm">No Signal</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+										{/* Right Controls - Fullscreen */}
+										<button
+											onClick={toggleFullscreen}
+											className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
+											title="Fullscreen"
+										>
+											<Maximize className="w-4 h-4 text-white" />
+										</button>
+									</div>
+								</div>
+							</div>
+						</div>
+					) : (
+						<div className="flex flex-col items-center gap-2 text-slate-500">
+							<span className="text-sm">No Signal</span>
+						</div>
+					)}
+				</div>
+			</div>
+
+			{/* Settings Dialog */}
+			<Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+				<DialogContent className="sm:max-w-[500px] bg-slate-800 border-slate-700">
+					<DialogHeader>
+						<DialogTitle className="text-white">Cài đặt Camera</DialogTitle>
+						<DialogDescription className="text-slate-400">
+							Cấu hình đường dẫn RTSP hoặc WHEP endpoint cho camera này
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-4 py-4">
+						<div className="space-y-2">
+							<Label htmlFor="rtsp-url" className="text-slate-300">
+								Đường dẫn RTSP
+							</Label>
+							<Input
+								id="rtsp-url"
+								type="text"
+								placeholder="rtsp://192.168.1.100:554/stream"
+								value={rtspUrl}
+								onChange={(e) => setRtspUrl(e.target.value)}
+								className="bg-slate-700 text-white border-slate-600 focus:border-blue-500"
+							/>
+							<p className="text-xs text-slate-500">
+								Ví dụ: rtsp://192.168.1.100:554/stream
+							</p>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="whep-url" className="text-slate-300">
+								WHEP Endpoint (hoặc để trống nếu đã nhập RTSP)
+							</Label>
+							<Input
+								id="whep-url"
+								type="text"
+								placeholder="http://192.168.1.100:8889/cam1/whep"
+								value={whepUrl}
+								onChange={(e) => setWhepUrl(e.target.value)}
+								className="bg-slate-700 text-white border-slate-600 focus:border-blue-500"
+							/>
+							<p className="text-xs text-slate-500">
+								Ví dụ: http://192.168.1.100:8889/cam1/whep
+							</p>
+						</div>
+						{currentUrl && (
+							<div className="p-3 bg-slate-700/50 rounded-md">
+								<p className="text-xs text-slate-400 mb-1">URL hiện tại:</p>
+								<p className="text-sm text-slate-300 break-all">{currentUrl}</p>
+							</div>
+						)}
+					</div>
+					<DialogFooter>
+						<Button
+							variant="outline"
+							onClick={() => setIsSettingsOpen(false)}
+							className="bg-slate-700 text-white border-slate-600 hover:bg-slate-600"
+						>
+							Hủy
+						</Button>
+						<Button
+							onClick={handleApplySettings}
+							className="bg-blue-600 text-white hover:bg-blue-700"
+						>
+							<Save className="w-4 h-4 mr-2" />
+							Áp dụng
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</div>
+	);
 }
+
+// Export alias for backward compatibility
+export const CameraFeed = LiveviewFeed;
