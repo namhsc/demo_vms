@@ -86,7 +86,6 @@ export function LiveviewFeed({
 	const [isFullscreen, setIsFullscreen] = useState(false);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 	const [rtspUrl, setRtspUrl] = useState('');
-	const [whepUrl, setWhepUrl] = useState(initialUrl || '');
 	const [currentUrl, setCurrentUrl] = useState(initialUrl || '');
 	const containerRef = useRef<HTMLDivElement>(null);
 	const lastPos = useRef({ x: 0, y: 0 });
@@ -158,46 +157,42 @@ export function LiveviewFeed({
 	useEffect(() => {
 		if (initialUrl) {
 			setCurrentUrl(initialUrl);
-			setWhepUrl(initialUrl);
 		}
 	}, [initialUrl]);
 
 	const handleApplySettings = () => {
-		// Nếu có RTSP URL, convert thành WHEP endpoint
-		// Giả sử backend sẽ xử lý conversion từ RTSP -> WHEP
-		// Hoặc người dùng có thể nhập WHEP endpoint trực tiếp
-		let newUrl = whepUrl;
-
-		if (rtspUrl && rtspUrl.trim() !== '') {
-			// Convert RTSP URL to WHEP endpoint
-			// Ví dụ: rtsp://192.168.1.100:554/stream -> http://192.168.1.100:8889/cam1/whep
-			// Hoặc có thể gọi API để convert
-			try {
-				const rtspMatch = rtspUrl.match(/rtsp:\/\/([^\/]+)(\/.*)?/);
-				if (rtspMatch) {
-					const host = rtspMatch[1];
-					const path = rtspMatch[2] || '/stream';
-					// Giả sử WHEP server chạy trên cùng host với port 8889
-					const hostParts = host.split(':');
-					const ip = hostParts[0];
-					// Extract camera name from path or use default
-					const cameraName =
-						path
-							.split('/')
-							.filter((p) => p)
-							.pop() || 'cam1';
-					newUrl = `http://${ip}:8889/${cameraName}/whep`;
-				}
-			} catch (err) {
-				console.error('Error converting RTSP URL:', err);
-				// Nếu không convert được, sử dụng WHEP URL trực tiếp
-			}
+		if (!rtspUrl || rtspUrl.trim() === '') {
+			return;
 		}
 
-		if (newUrl && newUrl !== currentUrl) {
-			setCurrentUrl(newUrl);
-			setIsSettingsOpen(false);
-			setIsLive(true);
+		// Convert RTSP URL to WHEP endpoint
+		// Ví dụ: rtsp://192.168.1.100:554/stream -> http://192.168.1.100:8889/cam1/whep
+		try {
+			const rtspMatch = rtspUrl.match(/rtsp:\/\/([^\/]+)(\/.*)?/);
+			if (rtspMatch) {
+				const host = rtspMatch[1];
+				const path = rtspMatch[2] || '/stream';
+				// Giả sử WHEP server chạy trên cùng host với port 8889
+				const hostParts = host.split(':');
+				const ip = hostParts[0];
+				// Extract camera name from path or use default
+				const cameraName =
+					path
+						.split('/')
+						.filter((p) => p)
+						.pop() || 'cam1';
+				const newUrl = `http://${ip}:8889/${cameraName}/whep`;
+
+				if (newUrl !== currentUrl) {
+					setCurrentUrl(newUrl);
+					setIsSettingsOpen(false);
+					setIsLive(true);
+				}
+			} else {
+				console.error('Invalid RTSP URL format');
+			}
+		} catch (err) {
+			console.error('Error converting RTSP URL:', err);
 		}
 	};
 
@@ -486,7 +481,7 @@ export function LiveviewFeed({
 						</div>
 					) : (
 						<div className="flex flex-col items-center gap-2 text-slate-500">
-							<span className="text-sm">No Signal</span>
+							<span className="text-sm">Không có tín hiệu</span>
 						</div>
 					)}
 				</div>
@@ -494,12 +489,17 @@ export function LiveviewFeed({
 
 			{/* Settings Dialog */}
 			<Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-				<DialogContent className="sm:max-w-[500px] bg-slate-800 border-slate-700">
+				<DialogContent className="sm:max-w-[500px] bg-slate-800 border-slate-700 [&>button]:text-white">
 					<DialogHeader>
 						<DialogTitle className="text-white">Cài đặt Camera</DialogTitle>
 						<DialogDescription className="text-slate-400">
-							Cấu hình đường dẫn RTSP hoặc WHEP endpoint cho camera này
+							Cấu hình đường dẫn RTSP cho camera này
 						</DialogDescription>
+						<div className="mt-2 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600">
+							<div className="flex items-center gap-2">
+								<span className="text-sm text-white font-medium">{name}</span>
+							</div>
+						</div>
 					</DialogHeader>
 					<div className="space-y-4 py-4">
 						<div className="space-y-2">
@@ -509,37 +509,12 @@ export function LiveviewFeed({
 							<Input
 								id="rtsp-url"
 								type="text"
-								placeholder="rtsp://192.168.1.100:554/stream"
+								placeholder="Nhập đường dẫn RTSP"
 								value={rtspUrl}
 								onChange={(e) => setRtspUrl(e.target.value)}
 								className="bg-slate-700 text-white border-slate-600 focus:border-blue-500"
 							/>
-							<p className="text-xs text-slate-500">
-								Ví dụ: rtsp://192.168.1.100:554/stream
-							</p>
 						</div>
-						<div className="space-y-2">
-							<Label htmlFor="whep-url" className="text-slate-300">
-								WHEP Endpoint (hoặc để trống nếu đã nhập RTSP)
-							</Label>
-							<Input
-								id="whep-url"
-								type="text"
-								placeholder="http://192.168.1.100:8889/cam1/whep"
-								value={whepUrl}
-								onChange={(e) => setWhepUrl(e.target.value)}
-								className="bg-slate-700 text-white border-slate-600 focus:border-blue-500"
-							/>
-							<p className="text-xs text-slate-500">
-								Ví dụ: http://192.168.1.100:8889/cam1/whep
-							</p>
-						</div>
-						{currentUrl && (
-							<div className="p-3 bg-slate-700/50 rounded-md">
-								<p className="text-xs text-slate-400 mb-1">URL hiện tại:</p>
-								<p className="text-sm text-slate-300 break-all">{currentUrl}</p>
-							</div>
-						)}
 					</div>
 					<DialogFooter>
 						<Button

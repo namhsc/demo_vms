@@ -234,9 +234,9 @@ function App() {
 								<Video className="w-6 h-6 text-white" />
 							</div>
 							<div>
-								<h1 className="text-xl text-white">Camera Management System</h1>
+								<h1 className="text-xl text-white">Hệ thống quản lý camera</h1>
 								<p className="text-sm text-slate-400">
-									Monitor and manage multiple camera feeds
+									Hệ thống quản lý camera thông minh
 								</p>
 							</div>
 						</div>
@@ -247,7 +247,7 @@ function App() {
 								className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors shadow-lg"
 							>
 								<RotateCcw className="w-4 h-4" />
-								Reset
+								Quay lại mặc định
 							</button>
 						</div>
 					</div>

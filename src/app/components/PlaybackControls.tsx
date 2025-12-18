@@ -192,42 +192,73 @@ export function PlaybackControls({
 
 	return (
 		<div className="bg-slate-800 border-t border-slate-700 rounded-b-xl">
-			{/* Timeline */}
+			{/* Control Bar */}
 			<div className="px-4 py-3 border-b border-slate-700">
-				<div className="flex items-center justify-between gap-4 mb-2">
-					<div className="flex items-center gap-4">
-						{activeCameraName && (
-							<div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 rounded-lg">
-								<span className="text-xs text-slate-400">Camera:</span>
-								<span className="text-sm text-white font-medium">
-									{activeCameraName}
-								</span>
-							</div>
-						)}
-						<div className="flex items-center gap-1">
-							<button
-								onClick={handleZoomOut}
-								className="p-1 hover:bg-slate-700 rounded transition-colors"
-								title="Zoom Out"
-							>
-								<ZoomOut className="w-4 h-4 text-slate-300" />
-							</button>
-							<span className="text-xs text-slate-400 min-w-[50px] text-center">
-								{zoomLevel.toFixed(1)}x
+				<div className="flex items-center justify-between gap-4">
+					{/* Left - Camera Name */}
+					{activeCameraName && (
+						<div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 rounded-lg">
+							<span className="text-xs text-slate-400">Camera:</span>
+							<span className="text-sm text-white font-medium">
+								{activeCameraName}
 							</span>
-							<button
-								onClick={handleZoomIn}
-								className="p-1 hover:bg-slate-700 rounded transition-colors"
-								title="Zoom In"
-							>
-								<ZoomIn className="w-4 h-4 text-slate-300" />
-							</button>
 						</div>
+					)}
+
+					{/* Center - Playback Controls */}
+					<div className="flex items-center gap-2 flex-1 justify-center">
+						<button
+							onClick={() => onSkip(-10)}
+							className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+							title="Rewind 10s"
+						>
+							<SkipBack className="w-5 h-5 text-white" />
+						</button>
+						<button
+							onClick={onPlayPause}
+							className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+							title={isPlaying ? 'Pause' : 'Play'}
+						>
+							{isPlaying ? (
+								<Pause className="w-5 h-5 text-white" fill="white" />
+							) : (
+								<Play className="w-5 h-5 text-white" fill="white" />
+							)}
+						</button>
+						<button
+							onClick={() => onSkip(10)}
+							className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+							title="Forward 10s"
+						>
+							<SkipForward className="w-5 h-5 text-white" />
+						</button>
 					</div>
-					<div className="text-xs text-slate-400 font-mono">
-						{formatTime(currentTime)} / {formatTime(duration)}
+
+					{/* Right - Zoom Controls */}
+					<div className="flex items-center gap-1">
+						<button
+							onClick={handleZoomOut}
+							className="p-1 hover:bg-slate-700 rounded transition-colors"
+							title="Zoom Out"
+						>
+							<ZoomOut className="w-4 h-4 text-slate-300" />
+						</button>
+						<span className="text-xs text-slate-400 min-w-[50px] text-center">
+							{zoomLevel.toFixed(1)}x
+						</span>
+						<button
+							onClick={handleZoomIn}
+							className="p-1 hover:bg-slate-700 rounded transition-colors"
+							title="Zoom In"
+						>
+							<ZoomIn className="w-4 h-4 text-slate-300" />
+						</button>
 					</div>
 				</div>
+			</div>
+
+			{/* Timeline */}
+			<div className="px-4 py-3 border-b border-slate-700">
 
 				{/* Timeline with markers */}
 				<div
@@ -264,79 +295,12 @@ export function PlaybackControls({
 							className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer playback-slider"
 						/>
 					</div>
-
-					{/* View range indicator */}
-					<div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
-						<span>{formatTime(viewStart)}</span>
-						<span className="text-slate-400">
-							{formatTime(visibleDuration)} visible
-						</span>
-						<span>{formatTime(viewEnd)}</span>
-					</div>
 				</div>
-			</div>
 
-			{/* Control Bar */}
-			<div className="px-4 py-3">
-				<div className="flex items-center justify-between gap-4">
-					{/* Left Controls - Playback */}
-					<div className="flex items-center gap-2">
-						<button
-							onClick={() => onSkip(-10)}
-							className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-							title="Rewind 10s"
-						>
-							<SkipBack className="w-5 h-5 text-white" />
-						</button>
-						<button
-							onClick={onPlayPause}
-							className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-							title={isPlaying ? 'Pause' : 'Play'}
-						>
-							{isPlaying ? (
-								<Pause className="w-5 h-5 text-white" fill="white" />
-							) : (
-								<Play className="w-5 h-5 text-white" fill="white" />
-							)}
-						</button>
-						<button
-							onClick={() => onSkip(10)}
-							className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-							title="Forward 10s"
-						>
-							<SkipForward className="w-5 h-5 text-white" />
-						</button>
-					</div>
-
-					{/* Center - Speed Control */}
-					<div className="flex items-center gap-2">
-						<span className="text-sm text-slate-300">Tốc độ:</span>
-						<select
-							value={playbackSpeed}
-							onChange={(e) => onSpeedChange(parseFloat(e.target.value))}
-							className="bg-slate-700 text-white text-sm px-3 py-1.5 rounded border border-slate-600 focus:outline-none focus:border-blue-500"
-						>
-							<option value="0.25">0.25x</option>
-							<option value="0.5">0.5x</option>
-							<option value="0.75">0.75x</option>
-							<option value="1">1x</option>
-							<option value="1.25">1.25x</option>
-							<option value="1.5">1.5x</option>
-							<option value="2">2x</option>
-							<option value="4">4x</option>
-						</select>
-					</div>
-
-					{/* Right - Status */}
-					<div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 rounded-lg">
-						<div
-							className={`w-2 h-2 rounded-full ${
-								isPlaying ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
-							}`}
-						/>
-						<span className="text-xs text-slate-300">
-							{isPlaying ? 'Đang phát' : 'Tạm dừng'}
-						</span>
+				{/* Time Display - Below Timeline */}
+				<div className="flex justify-center mt-2">
+					<div className="text-xs text-slate-400 font-mono">
+						{formatTime(currentTime)} / {formatTime(duration)}
 					</div>
 				</div>
 			</div>

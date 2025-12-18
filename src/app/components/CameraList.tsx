@@ -76,19 +76,6 @@ export function CameraList({
 											{camera.name}
 										</h3>
 									</div>
-									<div className="flex items-center gap-2 text-xs text-slate-400">
-										<span>{camera.i}</span>
-										<span>•</span>
-										<span>
-											Grid: {camera.w}x{camera.h}
-										</span>
-										{camera.hidden && (
-											<>
-												<span>•</span>
-												<span className="text-orange-400">Hidden</span>
-											</>
-										)}
-									</div>
 								</div>
 
 								<div className="flex items-center gap-1">
