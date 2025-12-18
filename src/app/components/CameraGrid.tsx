@@ -3,6 +3,7 @@ import { LiveviewFeed } from "./CameraFeed";
 import { PlaybackFeed } from "./PlaybackFeed";
 import "react-grid-layout/css/styles.css";
 import { Camera } from "../App";
+import React from "react";
 
 interface CameraGridProps {
   cameras: Camera[];
@@ -18,6 +19,7 @@ interface CameraGridProps {
   mode?: "liveview" | "playback";
   cols?: number;
   rowHeight?: number;
+  setCameras: React.Dispatch<React.SetStateAction<Camera[]>>;
 }
 
 export function CameraGrid({
@@ -29,6 +31,7 @@ export function CameraGrid({
   activeCameraId,
   playbackState,
   mode = "liveview",
+  setCameras,
 }: CameraGridProps) {
   // Filter out hidden cameras
   const visibleCameras = cameras.filter((camera) => !camera.hidden);
@@ -72,6 +75,8 @@ export function CameraGrid({
                 onRemove={onRemoveCamera}
                 onHide={onToggleCamera}
                 url={camera.url || ""}
+                setCameras={setCameras}
+                cameras={cameras}
               />
             ) : (
               <PlaybackFeed

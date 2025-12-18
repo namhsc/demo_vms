@@ -16,6 +16,8 @@ import {
   VIEWER_PASS,
   VIEWER_USER,
 } from "../../services/streamService";
+import { Camera } from "../App";
+import { toast } from "sonner";
 
 interface CameraFeedProps {
   id: string;
@@ -23,6 +25,8 @@ interface CameraFeedProps {
   onRemove: (id: string) => void;
   onHide?: (id: string) => void;
   url?: string;
+  setCameras: React.Dispatch<React.SetStateAction<Camera[]>>;
+  cameras: Camera[];
 }
 
 // Generate a random pattern for mock video feed
@@ -75,6 +79,8 @@ export function LiveviewFeed({
   onRemove,
   onHide,
   url: initialUrl,
+  setCameras,
+  cameras,
 }: CameraFeedProps) {
   const [isLive, setIsLive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -161,15 +167,27 @@ export function LiveviewFeed({
       return;
     }
     let retryTimer: number | null = null;
+
     const MAX_RETRY = 3;
     let attempt = 0;
 
     const rtspMatch = rtspUrl.match(/rtsp:\/\/([^\/]+)(\/.*)?/);
 
     if (!rtspMatch) {
-      console.error("Invalid RTSP URL format");
+      toast.warning("Invalid RTSP URL format");
       return;
     }
+    setIsSettingsOpen(false);
+
+    const updatedCameras = cameras.map((item) => {
+      if (item.i === id) {
+        return { ...item, url: rtspUrl };
+      } else {
+        return { ...item };
+      }
+    });
+    setCameras(updatedCameras);
+    localStorage.setItem("cameraLayout", JSON.stringify(updatedCameras));
 
     const fetchStream = async () => {
       try {
@@ -178,18 +196,17 @@ export function LiveviewFeed({
 
         if (data?.whepUrl) {
           setCurrentUrl(data.whepUrl);
-          setIsSettingsOpen(false);
-          return; // success → stop retry
+          return;
         }
 
         throw new Error("Server returned no WHEP URL");
       } catch (err) {
         console.error(`CreateStream failed (attempt ${attempt}):`, err);
-
         if (attempt < MAX_RETRY) {
-          retryTimer = setTimeout(fetchStream, 5000);
+          retryTimer = window.setTimeout(fetchStream, 5000);
         } else {
-          console.error("Max retry exceeded");
+          toast.error("Max retry exceeded");
+
           setCurrentUrl("");
         }
       }

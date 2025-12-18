@@ -7,7 +7,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import demoVideo from "../../../assets/video.mp4";
+import { VideoSegment } from "../App";
 
 interface PlaybackControlsProps {
   isPlaying: boolean;
@@ -28,19 +28,10 @@ interface PlaybackControlsProps {
   viewStart?: number;
   viewEnd?: number;
   onViewChange?: (start: number, end: number) => void;
+  segments: VideoSegment[];
 }
 
-const segments: VideoSegment[] = [
-  { start: 3600, end: 5400 }, // 01:00 → 01:30
-  { start: 7200, end: 9000 }, // 02:00 → 02:30
-];
-
-const DAY_SECONDS = 86400;
-
-interface VideoSegment {
-  start: number; // giây từ 00:00
-  end: number; // giây từ 00:00
-}
+export const DAY_SECONDS = 86400;
 
 // Format time for display
 const formatTime = (seconds: number) => {
@@ -74,6 +65,7 @@ export function PlaybackControls({
   viewStart: externalViewStart,
   viewEnd: externalViewEnd,
   onViewChange,
+  segments,
 }: PlaybackControlsProps) {
   // Internal zoom state if not controlled externally
   const [internalZoomLevel, setInternalZoomLevel] = useState(1);

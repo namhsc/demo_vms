@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { CameraGrid } from "./components/CameraGrid";
 import { CameraList } from "./components/CameraList";
-import { PlaybackControls } from "./components/PlaybackControls";
+import { DAY_SECONDS, PlaybackControls } from "./components/PlaybackControls";
 import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Grid3x3, RotateCcw, Video, Radio, History } from "lucide-react";
 import { Layout } from "react-grid-layout";
+import demoVideo from "../assets/video.mp4";
+import { Toaster } from "sonner";
 
 export interface Camera {
   i: string;
@@ -17,6 +19,41 @@ export interface Camera {
   url?: string;
 }
 
+export interface VideoSegment {
+  index: number;
+  start: number; // seconds
+  end: number; // seconds
+  label: string; // hiển thị UI
+}
+
+const SEGMENT_GAP_SECONDS = 30 * 60; // 30 phút
+
+const createSegmentsFromVideo = (durationSeconds: number): VideoSegment[] => {
+  const segments: VideoSegment[] = [];
+
+  let index = 0;
+  let start = 0;
+
+  while (start < DAY_SECONDS) {
+    const end = start + durationSeconds;
+
+    // Không cho segment vượt quá 24h
+    if (end > DAY_SECONDS) break;
+
+    segments.push({
+      index,
+      start,
+      end,
+      label: `Segment ${index + 1} (${Math.floor(start / 60)}m)`,
+    });
+
+    start = end + SEGMENT_GAP_SECONDS;
+    index++;
+  }
+
+  return segments;
+};
+
 const layoutDefault: Camera[] = [
   {
     i: "cam-1",
@@ -26,7 +63,7 @@ const layoutDefault: Camera[] = [
     h: 2,
     name: "Camera 1 - Entrance",
     hidden: false,
-    url: "rtsp://admin:AdminCam@192.168.16.239:554/Streaming/Channels/101?transportmode=unicast&profile=Profile_1",
+    // url: "rtsp://admin:AdminCam@192.168.16.239:554/Streaming/Channels/101?transportmode=unicast&profile=Profile_1",
   },
   {
     i: "cam-2",
@@ -36,12 +73,12 @@ const layoutDefault: Camera[] = [
     h: 2,
     name: "Camera 2 - Parking Lot",
     hidden: false,
-    url: "rtsp://admin:AdminCam@192.168.16.239:554/Streaming/Channels/101?transportmode=unicast&profile=Profile_1",
+    //url: "rtsp://admin:AdminCam@192.168.16.239:554/Streaming/Channels/101?transportmode=unicast&profile=Profile_1",
   },
   {
     i: "cam-3",
-    x: 4,
-    y: 0,
+    x: 0,
+    y: 2,
     w: 4,
     h: 2,
     name: "Camera 2 - Parking Lot",
@@ -57,8 +94,7 @@ function App() {
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration] = useState(3600); // 1 hour in seconds
+  // const [currentTime, setCurrentTime] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState("00:00");
@@ -67,9 +103,15 @@ function App() {
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [viewStart, setViewStart] = useState(0);
   const [viewEnd, setViewEnd] = useState(3600);
-  const [cameras, setCameras] = useState<Camera[]>(layoutDefault);
-
-  const [nextCameraId, setNextCameraId] = useState(6);
+  const [cameras, setCameras] = useState<Camera[]>(() => {
+    const savedLayout = localStorage.getItem("cameraLayout");
+    if (savedLayout) {
+      const parsedLayout = JSON.parse(savedLayout);
+      return parsedLayout;
+    } else {
+      return layoutDefault;
+    }
+  });
 
   const handleLayoutChange = (layout: Layout) => {
     console.log("Layout changed:", layout);
@@ -87,6 +129,7 @@ function App() {
       return camera;
     });
     setCameras(updatedCameras);
+    localStorage.setItem("cameraLayout", JSON.stringify(updatedCameras));
   };
 
   const handleRemoveCamera = (id: string) => {
@@ -103,24 +146,66 @@ function App() {
 
   const handleResetLayout = () => {
     setCameras(layoutDefault);
-    setNextCameraId(6);
   };
 
-  const handleLoadLayout = () => {
-    const savedLayout = localStorage.getItem("cameraLayout");
-    if (savedLayout) {
-      const parsedLayout = JSON.parse(savedLayout);
-      setCameras(parsedLayout);
-      const maxId = Math.max(
-        ...parsedLayout.map((cam: Camera) => parseInt(cam.i.split("-")[1]))
-      );
-      setNextCameraId(maxId + 1);
-    }
+  const handlePlaybackCameraSelect = (id: string) => {
+    setActivePlaybackCamera(id);
   };
 
-  React.useEffect(() => {
-    handleLoadLayout();
+  const handlePlayPause = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleSeek = (time: number) => {
+    setCurrentTime(time);
+  };
+
+  const handleSkip = (seconds: number) => {
+    const newTime = Math.min(Math.max(currentTime + seconds, 0), duration);
+    setCurrentTime(newTime);
+  };
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [segments, setSegments] = useState<VideoSegment[]>([]);
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(
+    null
+  );
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.src = demoVideo;
+
+    video.onloadedmetadata = () => {
+      const durationSeconds = video.duration;
+      const segments = createSegmentsFromVideo(durationSeconds);
+
+      setDuration(durationSeconds);
+      setSegments(segments);
+    };
+
+    video.ontimeupdate = () => {
+      setCurrentTime(video.currentTime);
+    };
   }, []);
+
+  useEffect(() => {
+    console.log("segmentss", segments);
+  }, [segments]);
+
+  useEffect(() => {
+    const active = segments.find(
+      (s) => currentTime >= s.start && currentTime < s.end
+    );
+
+    if (active && active.index !== activeSegmentIndex) {
+      setActiveSegmentIndex(active.index);
+    }
+  }, [currentTime, segments]);
 
   // Simulate playback time (in real app, this would come from video element)
   useEffect(() => {
@@ -140,193 +225,189 @@ function App() {
     return () => clearInterval(interval);
   }, [isPlaying, playbackSpeed, duration, viewMode]);
 
-  const handlePlaybackCameraSelect = (id: string) => {
-    setActivePlaybackCamera(id);
-  };
-
-  const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleSeek = (time: number) => {
-    setCurrentTime(time);
-  };
-
-  const handleSkip = (seconds: number) => {
-    const newTime = Math.min(Math.max(currentTime + seconds, 0), duration);
-    setCurrentTime(newTime);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col">
-      {/* Header / Toolbar */}
-      <header className="bg-slate-900 border-b border-slate-800 shadow-lg">
-        <div className="max-w-[1600px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Video className="w-6 h-6 text-white" />
+    <>
+      <div className="min-h-screen bg-slate-950 flex flex-col">
+        {/* Header / Toolbar */}
+        <header className="bg-slate-900 border-b border-slate-800 shadow-lg">
+          <div className="max-w-[1600px] mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <Video className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl text-white">
+                    Hệ thống quản lý camera
+                  </h1>
+                  <p className="text-sm text-slate-400">
+                    Hệ thống quản lý camera thông minh
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl text-white">Hệ thống quản lý camera</h1>
-                <p className="text-sm text-slate-400">
-                  Hệ thống quản lý camera thông minh
-                </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleResetLayout}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors shadow-lg"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Quay lại mặc định
+                </button>
               </div>
             </div>
+          </div>
+        </header>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleResetLayout}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors shadow-lg"
+        {/* Stats Bar */}
+        <div className="bg-slate-900/50 border-b border-slate-800">
+          <div className="max-w-[1600px] mx-auto px-6 py-3">
+            <div className="flex items-center justify-between">
+              {/* View Mode Tabs */}
+              <Tabs
+                value={viewMode}
+                onValueChange={(value) =>
+                  setViewMode(value as "liveview" | "playback")
+                }
+                className="w-auto"
               >
-                <RotateCcw className="w-4 h-4" />
-                Quay lại mặc định
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+                <TabsList className="bg-slate-700/80 border border-slate-600/50 shadow-lg">
+                  <TabsTrigger
+                    value="liveview"
+                    className="text-slate-300 hover:text-white hover:bg-slate-600/50 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200"
+                  >
+                    <Radio className="w-4 h-4 mr-2" />
+                    Xem trực tiếp
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="playback"
+                    className="text-slate-300 hover:text-white hover:bg-slate-600/50 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200"
+                  >
+                    <History className="w-4 h-4 mr-2" />
+                    Xem lại
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
 
-      {/* Stats Bar */}
-      <div className="bg-slate-900/50 border-b border-slate-800">
-        <div className="max-w-[1600px] mx-auto px-6 py-3">
-          <div className="flex items-center justify-between">
-            {/* View Mode Tabs */}
-            <Tabs
-              value={viewMode}
-              onValueChange={(value) =>
-                setViewMode(value as "liveview" | "playback")
-              }
-              className="w-auto"
-            >
-              <TabsList className="bg-slate-700/80 border border-slate-600/50 shadow-lg">
-                <TabsTrigger
-                  value="liveview"
-                  className="text-slate-300 hover:text-white hover:bg-slate-600/50 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200"
-                >
-                  <Radio className="w-4 h-4 mr-2" />
-                  Xem trực tiếp
-                </TabsTrigger>
-                <TabsTrigger
-                  value="playback"
-                  className="text-slate-300 hover:text-white hover:bg-slate-600/50 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200"
-                >
-                  <History className="w-4 h-4 mr-2" />
-                  Xem lại
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Grid3x3 className="w-4 h-4 text-slate-400" />
-                <span className="text-sm text-slate-400">
-                  Active Cameras:{" "}
-                  <span className="text-white">{cameras.length}</span>
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-sm text-slate-400">
-                  Status:{" "}
-                  <span className="text-green-400">All Systems Online</span>
-                </span>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Grid3x3 className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm text-slate-400">
+                    Active Cameras:{" "}
+                    <span className="text-white">{cameras.length}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-sm text-slate-400">
+                    Status:{" "}
+                    <span className="text-green-400">All Systems Online</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-[1600px] mx-auto  py-6 w-full">
-        {cameras.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500">
-            <Video className="w-24 h-24 mb-4" />
-            <h2 className="text-xl mb-2">No Cameras Added</h2>
-            <p className="text-sm">No cameras available</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-12 gap-6">
-            {/* Camera List Sidebar */}
-            <div className="col-span-3">
-              <CameraList
-                cameras={cameras}
-                onRemoveCamera={handleRemoveCamera}
-                onToggleCamera={handleToggleCamera}
-              />
+        {/* Main Content */}
+        <main className="flex-1 max-w-[1600px] mx-auto  py-6 w-full">
+          {cameras.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500">
+              <Video className="w-24 h-24 mb-4" />
+              <h2 className="text-xl mb-2">No Cameras Added</h2>
+              <p className="text-sm">No cameras available</p>
             </div>
-
-            {/* Camera Grid */}
-            <div className="col-span-9 bg-slate-900/30 rounded-xl p-4 flex flex-col">
-              <div className="flex-1">
-                <CameraGrid
+          ) : (
+            <div className="grid grid-cols-12 gap-6">
+              {/* Camera List Sidebar */}
+              <div className="col-span-3">
+                <CameraList
                   cameras={cameras}
-                  onLayoutChange={handleLayoutChange}
                   onRemoveCamera={handleRemoveCamera}
                   onToggleCamera={handleToggleCamera}
-                  onSelectCamera={
-                    viewMode === "playback"
-                      ? handlePlaybackCameraSelect
-                      : undefined
-                  }
-                  activeCameraId={
-                    viewMode === "playback" ? activePlaybackCamera : undefined
-                  }
-                  playbackState={
-                    viewMode === "playback"
-                      ? {
-                          isPlaying,
-                          currentTime,
-                        }
-                      : undefined
-                  }
-                  mode={viewMode}
                 />
               </div>
-              {viewMode === "playback" && (
-                <PlaybackControls
-                  isPlaying={isPlaying}
-                  currentTime={currentTime}
-                  duration={duration}
-                  playbackSpeed={playbackSpeed}
-                  selectedDate={selectedDate}
-                  selectedTime={selectedTime}
-                  onPlayPause={handlePlayPause}
-                  onSeek={handleSeek}
-                  onSkip={handleSkip}
-                  onSpeedChange={setPlaybackSpeed}
-                  onDateChange={setSelectedDate}
-                  onTimeChange={setSelectedTime}
-                  activeCameraName={
-                    activePlaybackCamera
-                      ? cameras.find((c) => c.i === activePlaybackCamera)?.name
-                      : undefined
-                  }
-                  zoomLevel={timelineZoom}
-                  onZoomChange={setTimelineZoom}
-                  viewStart={viewStart}
-                  viewEnd={viewEnd}
-                  onViewChange={(start, end) => {
-                    setViewStart(start);
-                    setViewEnd(end);
-                  }}
-                />
-              )}
+
+              {/* Camera Grid */}
+              <div className="col-span-9 bg-slate-900/30 rounded-xl p-4 flex flex-col">
+                <div className="flex-1">
+                  <CameraGrid
+                    cameras={cameras}
+                    onLayoutChange={handleLayoutChange}
+                    onRemoveCamera={handleRemoveCamera}
+                    onToggleCamera={handleToggleCamera}
+                    onSelectCamera={
+                      viewMode === "playback"
+                        ? handlePlaybackCameraSelect
+                        : undefined
+                    }
+                    activeCameraId={
+                      viewMode === "playback" ? activePlaybackCamera : undefined
+                    }
+                    playbackState={
+                      viewMode === "playback"
+                        ? { isPlaying, currentTime }
+                        : undefined
+                    }
+                    mode={viewMode}
+                    setCameras={setCameras}
+                  />
+                </div>
+                {viewMode === "playback" && (
+                  <PlaybackControls
+                    segments={segments}
+                    isPlaying={isPlaying}
+                    currentTime={currentTime}
+                    duration={duration}
+                    playbackSpeed={playbackSpeed}
+                    selectedDate={selectedDate}
+                    selectedTime={selectedTime}
+                    onPlayPause={handlePlayPause}
+                    onSeek={handleSeek}
+                    onSkip={handleSkip}
+                    onSpeedChange={setPlaybackSpeed}
+                    onDateChange={setSelectedDate}
+                    onTimeChange={setSelectedTime}
+                    activeCameraName={
+                      activePlaybackCamera
+                        ? cameras.find((c) => c.i === activePlaybackCamera)
+                            ?.name
+                        : undefined
+                    }
+                    zoomLevel={timelineZoom}
+                    onZoomChange={setTimelineZoom}
+                    viewStart={viewStart}
+                    viewEnd={viewEnd}
+                    onViewChange={(start, end) => {
+                      setViewStart(start);
+                      setViewEnd(end);
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* Footer */}
+        <footer className="bg-slate-900 border-t border-slate-800 mt-auto">
+          <div className="max-w-[1600px] mx-auto px-6 py-4">
+            <div className="flex items-center justify-between text-sm text-slate-500">
+              <div>© 2025 Camera Management System</div>
             </div>
           </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-slate-900 border-t border-slate-800 mt-auto">
-        <div className="max-w-[1600px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between text-sm text-slate-500">
-            <div>© 2025 Camera Management System</div>
-          </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+        <video
+          ref={videoRef}
+          src={demoVideo}
+          muted
+          playsInline
+          className="w-full h-full object-cover"
+          style={{ display: "none" }}
+        />
+      </div>
+      <Toaster position="top-right" richColors closeButton duration={3000} />
+    </>
   );
 }
 
