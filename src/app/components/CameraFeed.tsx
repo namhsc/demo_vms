@@ -1,16 +1,31 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Settings, X, Play, Pause, Maximize } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  createStream,
-  VIEWER_PASS,
-  VIEWER_USER,
-} from "../../services/streamService";
+  Settings,
+  X,
+  Play,
+  Pause,
+  Maximize,
+  Minimize2,
+  Save,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 interface CameraFeedProps {
   id: string;
   name: string;
   onRemove: (id: string) => void;
-  url: string;
+  onHide?: (id: string) => void;
+  url?: string;
 }
 
 // Generate a random pattern for mock video feed
@@ -57,39 +72,28 @@ const generatePattern = () => {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
-export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
+export function LiveviewFeed({
+  id,
+  name,
+  onRemove,
+  onHide,
+  url: initialUrl,
+}: CameraFeedProps) {
   const [isLive, setIsLive] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [timestamp, setTimestamp] = useState(new Date());
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [rtspUrl, setRtspUrl] = useState("");
+  const [whepUrl, setWhepUrl] = useState(initialUrl || "");
+  const [currentUrl, setCurrentUrl] = useState(initialUrl || "");
   const containerRef = useRef<HTMLDivElement>(null);
   const lastPos = useRef({ x: 0, y: 0 });
   const videoContentRef = useRef<HTMLDivElement>(null);
   const [scaleZoom, setScaleZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const [whepUrl, setWhepUrl] = useState("");
-
-  useEffect(() => {
-    if (!url) return;
-
-    createStream(url)
-      .then((data) => {
-        if (data && data.whepUrl) {
-          setWhepUrl(data.whepUrl);
-        } else {
-          setWhepUrl("");
-        }
-      })
-      .catch(() => {
-        console.error("Stream error → retry in 5s");
-        setTimeout(
-          () => createStream(url).then((d) => setWhepUrl(d.whepUrl)),
-          5000
-        );
-      });
-  }, [url]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -99,6 +103,7 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
     return () => clearInterval(interval);
   }, []);
 
+  // Listen for fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -146,23 +151,80 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
   };
 
   const videoRef = useRef(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+
+  // Update URL when initialUrl changes
+  useEffect(() => {
+    console.log("initialUrl", initialUrl);
+    if (initialUrl) {
+      setCurrentUrl(initialUrl);
+      setWhepUrl(initialUrl);
+    }
+  }, [initialUrl]);
+
+  const handleApplySettings = () => {
+    // Nếu có RTSP URL, convert thành WHEP endpoint
+    // Giả sử backend sẽ xử lý conversion từ RTSP -> WHEP
+    // Hoặc người dùng có thể nhập WHEP endpoint trực tiếp
+    let newUrl = whepUrl;
+
+    if (rtspUrl && rtspUrl.trim() !== "") {
+      // Convert RTSP URL to WHEP endpoint
+      // Ví dụ: rtsp://192.168.1.100:554/stream -> http://192.168.1.100:8889/cam1/whep
+      // Hoặc có thể gọi API để convert
+      try {
+        const rtspMatch = rtspUrl.match(/rtsp:\/\/([^\/]+)(\/.*)?/);
+        if (rtspMatch) {
+          const host = rtspMatch[1];
+          const path = rtspMatch[2] || "/stream";
+          // Giả sử WHEP server chạy trên cùng host với port 8889
+          const hostParts = host.split(":");
+          const ip = hostParts[0];
+          // Extract camera name from path or use default
+          const cameraName =
+            path
+              .split("/")
+              .filter((p) => p)
+              .pop() || "cam1";
+          newUrl = `http://${ip}:8889/${cameraName}/whep`;
+        }
+      } catch (err) {
+        console.error("Error converting RTSP URL:", err);
+        // Nếu không convert được, sử dụng WHEP URL trực tiếp
+      }
+    }
+
+    if (newUrl && newUrl !== currentUrl) {
+      setCurrentUrl(newUrl);
+      setIsSettingsOpen(false);
+      setIsLive(true);
+    }
+  };
 
   useEffect(() => {
-    if (!whepUrl) return;
+    if (!currentUrl) return;
 
     const video = videoRef.current as any;
-    const pc = new RTCPeerConnection({
-      iceServers: [],
-    });
+
+    // Close previous connection if exists
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+
+    const pc = new RTCPeerConnection();
+    pcRef.current = pc;
 
     if (!video) {
       console.error("Video element not found");
       return;
     }
+
     // Khi nhận được track từ MediaMTX → hiển thị lên video
     pc.ontrack = (event) => {
-      console.log("✔ Track received");
+      console.log("Receiving track from MediaMTX", event);
       video.srcObject = event.streams[0];
+      setIsLive(true);
     };
 
     // Debug ICE (không cần gửi ICE lên MediaMTX)
@@ -172,58 +234,55 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
       }
     };
 
+    // Error handling
+    pc.onconnectionstatechange = () => {
+      console.log("Connection state:", pc.connectionState);
+      if (
+        pc.connectionState === "failed" ||
+        pc.connectionState === "disconnected"
+      ) {
+        setIsLive(false);
+      }
+    };
+
     // Bắt đầu WebRTC
-    const startWebRTC = async () => {
+    const start = async () => {
       try {
-        const offer = await pc.createOffer({
-          offerToReceiveVideo: true,
-          offerToReceiveAudio: true,
-        });
+        const offer = await pc.createOffer({ offerToReceiveVideo: true });
         await pc.setLocalDescription(offer);
 
-        const authHeader = "Basic " + btoa(`${VIEWER_USER}:${VIEWER_PASS}`);
-
-        const response = await fetch(whepUrl, {
+        // Gọi tới endpoint WHEP của MediaMTX
+        const res = await fetch(currentUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/sdp",
-            Authorization: authHeader,
-          },
-          body: offer.sdp || "",
+          headers: { "Content-Type": "application/sdp" },
+          body: offer.sdp,
         });
 
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`WHEP failed (${response.status}): ${text}`);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
         }
 
-        const answerSDP = await response.text();
+        const answer = await res.text();
 
-        await pc.setRemoteDescription({ type: "answer", sdp: answerSDP });
+        await pc.setRemoteDescription({ type: "answer", sdp: answer });
 
-        console.log("WebRTC connected:", whepUrl);
+        console.log("WebRTC connected:", currentUrl);
+        setIsLive(true);
       } catch (err) {
         console.error("WebRTC error:", err);
+        setIsLive(false);
       }
     };
 
-    let retryTimer: any;
+    start();
 
-    const connect = async () => {
-      try {
-        await startWebRTC();
-      } catch (err) {
-        console.error("WebRTC failed, retry in 3s...");
-        retryTimer = setTimeout(connect, 3000); // auto reconnect
-      }
-    };
-
-    connect();
     return () => {
-      pc.getSenders().forEach((s) => s.track && s.track.stop());
-      pc.close();
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
     };
-  }, [whepUrl]);
+  }, [currentUrl]);
 
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
@@ -276,6 +335,7 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
   };
 
   const handleMouseUp = () => setIsPanning(false);
+  const handleMouseLeave = () => setIsPanning(false);
 
   return (
     <div
@@ -302,13 +362,20 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
           <button
             className="p-1 hover:bg-slate-700 rounded transition-colors"
             title="Settings"
+            onClick={() => setIsSettingsOpen(true)}
           >
             <Settings className="w-4 h-4 text-slate-300" />
           </button>
           <button
             className="p-1 hover:bg-slate-700 rounded transition-colors"
-            onClick={() => onRemove(id)}
-            title="Remove Camera"
+            onClick={() => {
+              if (onHide) {
+                onHide(id);
+              } else {
+                onRemove(id);
+              }
+            }}
+            title={onHide ? "Ẩn Camera" : "Remove Camera"}
           >
             <X
               className={`${
@@ -424,6 +491,77 @@ export function CameraFeed({ id, name, onRemove, url }: CameraFeedProps) {
           )}
         </div>
       </div>
+
+      {/* Settings Dialog */}
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="sm:max-w-[500px] bg-slate-800 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">Cài đặt Camera</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Cấu hình đường dẫn RTSP hoặc WHEP endpoint cho camera này
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rtsp-url" className="text-slate-300">
+                Đường dẫn RTSP
+              </Label>
+              <Input
+                id="rtsp-url"
+                type="text"
+                placeholder="rtsp://192.168.1.100:554/stream"
+                value={rtspUrl}
+                onChange={(e) => setRtspUrl(e.target.value)}
+                className="bg-slate-700 text-white border-slate-600 focus:border-blue-500"
+              />
+              <p className="text-xs text-slate-500">
+                Ví dụ: rtsp://192.168.1.100:554/stream
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="whep-url" className="text-slate-300">
+                WHEP Endpoint (hoặc để trống nếu đã nhập RTSP)
+              </Label>
+              <Input
+                id="whep-url"
+                type="text"
+                placeholder="http://192.168.1.100:8889/cam1/whep"
+                value={whepUrl}
+                onChange={(e) => setWhepUrl(e.target.value)}
+                className="bg-slate-700 text-white border-slate-600 focus:border-blue-500"
+              />
+              <p className="text-xs text-slate-500">
+                Ví dụ: http://192.168.1.100:8889/cam1/whep
+              </p>
+            </div>
+            {currentUrl && (
+              <div className="p-3 bg-slate-700/50 rounded-md">
+                <p className="text-xs text-slate-400 mb-1">URL hiện tại:</p>
+                <p className="text-sm text-slate-300 break-all">{currentUrl}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsSettingsOpen(false)}
+              className="bg-slate-700 text-white border-slate-600 hover:bg-slate-600"
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleApplySettings}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Áp dụng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+// Export alias for backward compatibility
+export const CameraFeed = LiveviewFeed;
