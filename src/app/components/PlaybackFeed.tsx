@@ -233,7 +233,11 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
       video.ontimeupdate = () => {
         const localTime = video.currentTime;
         const segment = segements[activeSegmentIndex];
+        console.log("activeSegmentIndex", activeSegmentIndex);
         if (!segment) return;
+        console.log("segment", segment);
+        console.log("localTime", localTime);
+
         const globalTime = segment.start + localTime;
 
         setSegmentLocalTime(localTime);
@@ -247,8 +251,10 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
             activeSegment: activeSegmentIndex,
           }));
         }
+        console.log("duration", video.duration);
+
         // nếu hết file video → chuyển sang segment tiếp theo
-        if (localTime >= video.duration - 0.2) {
+        if (localTime >= video.duration - 0.5) {
           goToNextSegment();
         }
       };
@@ -263,7 +269,7 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
 
     const goToNextSegment = () => {
       const next = activeSegmentIndex + 1;
-
+      console.log("Chuyển sang segment tiếp theo:", next);
       if (next >= segements.length) {
         console.log("Hết tất cả segment → dừng video");
         videoRef.current?.pause();

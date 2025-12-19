@@ -34,9 +34,7 @@ export const getListStream = async (camId: string) => {
   try {
     const response = await axios.get(
       `http://192.168.17.43:8999/api/videos?cameraId=cam_record_02&date=2025-12-19`,
-      {
-        headers: { "Content-Type": "application/json" },
-      }
+      { headers: { "Content-Type": "application/json" } }
     );
 
     return response.data;
@@ -46,7 +44,6 @@ export const getListStream = async (camId: string) => {
 };
 
 const parseTimeFromFileName = (fileName: string) => {
-  // "04-30-26.mp4"
   const [hh, mm, ss] = fileName.replace(".mp4", "").split("-").map(Number);
   return { hh, mm, ss };
 };
@@ -66,7 +63,7 @@ export const createSegmentsFromRecordList = (
   records: RecordVideoApi[]
 ): VideoSegment[] => {
   const segments: VideoSegment[] = [];
-
+  console.log("records", records);
   records.forEach((record, index) => {
     /** 1. Parse start time từ fileName */
     const { hh, mm, ss } = parseTimeFromFileName(record.fileName);
@@ -90,8 +87,15 @@ export const createSegmentsFromRecordList = (
       start: startSeconds,
       end: endSeconds,
       src: record.url,
+      fileName: record.fileName,
+      createdAt: record.createdAt,
     });
   });
+
+  console.log(
+    "sadsd",
+    segments.sort((a, b) => a.start - b.start)
+  );
 
   return segments.sort((a, b) => a.start - b.start);
 };

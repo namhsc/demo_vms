@@ -30,10 +30,11 @@ export interface VideoSegment {
   start: number; // seconds
   end: number; // seconds
   src: string; // video source URL
+  fileName?: string;
+  createdAt?: string;
 }
 
 const SEGMENT_GAP_SECONDS = 30 * 60; // 30 phút
-const CAMERA_OFFSET_SECONDS = 10 * 60; // mỗi camera lệch 10 phút
 
 const createSegmentsForCamera = (
   durationSeconds: number,
@@ -168,7 +169,7 @@ function App() {
     // setCurrentTime(newTime);
   };
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // const videoRef = useRef<HTMLVideoElement>(null);
 
   // const [duration, setDuration] = useState(0);
   const [segments, setSegments] = useState<VideoSegment[]>([]);
