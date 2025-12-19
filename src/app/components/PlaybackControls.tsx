@@ -75,26 +75,34 @@ export function PlaybackControls({
   // const [internalViewStart, setInternalViewStart] = useState(0);
   // const [internalViewEnd, setInternalViewEnd] = useState(duration);
 
-  // const zoomLevel = externalZoomLevel ?? internalZoomLevel;
+  const zoomLevel = externalZoomLevel ?? internalZoomLevel;
   // const viewStart = externalViewStart ?? internalViewStart;
   // const viewEnd = externalViewEnd ?? internalViewEnd;
 
   const timelineRef = useRef<HTMLDivElement>(null);
 
-  // // Calculate visible duration based on zoom
+  // Calculate visible duration based on zoom
   // const visibleDuration = viewEnd - viewStart;
-  // const zoomStep = 0.1;
-  // const minZoom = 0.5; // Show 2x duration
-  // const maxZoom = 10; // Show 1/10 duration
+  const zoomStep = 0.1;
+  const minZoom = 0.5; // Show 2x duration
+  const maxZoom = 16; // Show 1/16 duration
 
   const handleZoomIn = () => {
-    // const newZoom = Math.min(zoomLevel + zoomStep, maxZoom);
-    // updateZoom(newZoom);
+    const newZoom = Math.min(zoomLevel + zoomStep, maxZoom);
+    if (onZoomChange) {
+      onZoomChange(newZoom);
+    } else {
+      setInternalZoomLevel(newZoom);
+    }
   };
 
   const handleZoomOut = () => {
-    // const newZoom = Math.max(zoomLevel - zoomStep, minZoom);
-    // updateZoom(newZoom);
+    const newZoom = Math.max(zoomLevel - zoomStep, minZoom);
+    if (onZoomChange) {
+      onZoomChange(newZoom);
+    } else {
+      setInternalZoomLevel(newZoom);
+    }
   };
 
   // const updateZoom = (newZoom: number) => {
@@ -163,10 +171,15 @@ export function PlaybackControls({
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    if (e.deltaY < 0) {
-      handleZoomIn();
+    // Tính toán zoom dựa trên deltaY để zoom mượt hơn
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9; // Zoom in khi cuộn lên, zoom out khi cuộn xuống
+    const currentZoom = zoomLevel;
+    const newZoom = Math.max(minZoom, Math.min(maxZoom, currentZoom * zoomFactor));
+    
+    if (onZoomChange) {
+      onZoomChange(newZoom);
     } else {
-      handleZoomOut();
+      setInternalZoomLevel(newZoom);
     }
   };
 
@@ -236,17 +249,17 @@ export function PlaybackControls({
           {/* Right - Zoom Controls */}
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setInternalZoomLevel((z) => Math.max(1, z / 2))}
+              onClick={handleZoomOut}
               className="p-1 hover:bg-slate-700 rounded transition-colors"
               title="Zoom Out"
             >
               <ZoomOut className="w-4 h-4 text-slate-300" />
             </button>
             <span className="text-xs text-slate-400 min-w-[50px] text-center">
-              {internalZoomLevel}x
+              {zoomLevel.toFixed(1)}x
             </span>
             <button
-              onClick={() => setInternalZoomLevel((z) => Math.min(16, z * 2))}
+              onClick={handleZoomIn}
               className="p-1 hover:bg-slate-700 rounded transition-colors"
               title="Zoom In"
             >
@@ -257,13 +270,13 @@ export function PlaybackControls({
       </div>
 
       {/* Timeline */}
-      <div className="px-4 py-3 pb-8 relative border-b border-slate-700 overflow-auto">
+      <div className="px-4 py-3 pb-8 relative border-b border-slate-700 overflow-x-auto overflow-y-hidden timeline-container" style={{ scrollbarWidth: 'thin', scrollbarColor: '#475569 #1e293b', scrollbarGutter: 'stable', minHeight: '120px' }}>
         {/* Timeline with markers */}
         <div
           ref={timelineRef}
-          className="relative mb-2"
+          className="relative mb-2 min-w-full"
           onWheel={handleWheel}
-          style={{ width: `${internalZoomLevel * 100}%` }}
+          style={{ width: `${zoomLevel * 100}%`, minWidth: '100%' }}
           onClick={handleTimelineClick}
         >
           {/* Time markers */}
@@ -326,13 +339,11 @@ export function PlaybackControls({
             />
           </div>
         </div>
-        <div
-          className="flex justify-center absolute bottom-2"
-          style={{ left: "50%", transform: "translateX(-50%)" }}
-        >
-          <div className="text-xs text-slate-400 font-mono">
-            {formatTime(currentTime)} / {formatTime(DAY_SECONDS)}
-          </div>
+      </div>
+      {/* Time Display - Below Timeline */}
+      <div className="flex justify-center py-2">
+        <div className="text-xs text-slate-400 font-mono">
+          {formatTime(currentTime)} / {formatTime(DAY_SECONDS)}
         </div>
       </div>
       {/* Time Display - Below Timeline */}
@@ -355,6 +366,28 @@ export function PlaybackControls({
           background: #3b82f6;
           cursor: pointer;
           border: 2px solid #1e293b;
+        }
+        /* Smooth scrolling for timeline */
+        .timeline-container {
+          scroll-behavior: smooth;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-gutter: stable;
+          /* Đảm bảo scrollbar không làm layout bị nhảy */
+          contain: layout;
+        }
+        .timeline-container::-webkit-scrollbar {
+          height: 8px;
+        }
+        .timeline-container::-webkit-scrollbar-track {
+          background: #1e293b;
+          border-radius: 4px;
+        }
+        .timeline-container::-webkit-scrollbar-thumb {
+          background: #475569;
+          border-radius: 4px;
+        }
+        .timeline-container::-webkit-scrollbar-thumb:hover {
+          background: #64748b;
         }
       `}</style>
     </div>

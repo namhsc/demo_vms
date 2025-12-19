@@ -25,8 +25,8 @@ export function CameraList({
   onCameraClick,
 }: CameraListProps) {
   return (
-    <div className="bg-slate-900 rounded-xl p-4 h-full">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-slate-900 rounded-xl p-4 h-full flex flex-col min-h-0">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h2 className="text-lg text-white flex items-center gap-2">
           <Video className="w-5 h-5" />
           Danh sách Camera
@@ -36,7 +36,7 @@ export function CameraList({
         </span>
       </div>
 
-      <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar">
+      <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
         {cameras.length === 0 ? (
           <div className="text-center py-8 text-slate-500">
             <Video className="w-12 h-12 mx-auto mb-2 opacity-50" />
