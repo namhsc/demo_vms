@@ -191,7 +191,7 @@ export function LiveviewFeed({
   };
 
   const videoRef = useRef(null);
-
+  const [reloadCounter, setReloadCounter] = useState(0);
   // Update URL when initialUrl changes
   useEffect(() => {
     if (initialUrl) {
@@ -232,7 +232,7 @@ export function LiveviewFeed({
     setCameras(updatedCameras);
 
     localStorage.setItem("cameraLayout", JSON.stringify(updatedCameras));
-    console.log("isRecord", isRecord);
+
     const fetchStream = async () => {
       try {
         attempt++;
@@ -240,6 +240,7 @@ export function LiveviewFeed({
 
         if (data?.whepUrl) {
           setCurrentUrl(data.whepUrl);
+          setReloadCounter((prev) => prev + 1);
           setSegmentsByCameraId((prev) => ({
             ...prev,
             [id]: {
@@ -277,7 +278,7 @@ export function LiveviewFeed({
   };
 
   useEffect(() => {
-    if (!currentUrl) return;
+    if (!currentUrl || !reloadCounter) return;
     const video = videoRef.current as any;
     let pc: RTCPeerConnection | null = null;
     let retryTimer: number | null = null;
@@ -367,7 +368,7 @@ export function LiveviewFeed({
         pc = null;
       }
     };
-  }, [currentUrl]);
+  }, [currentUrl, reloadCounter]);
 
   const containerDivRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({
