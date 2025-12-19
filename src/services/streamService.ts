@@ -9,7 +9,10 @@ export const PATH_NAME = "p_se3qwd5idgv1t"; // path đã tạo
 export const VIEWER_USER = "viewer"; // user read
 export const VIEWER_PASS = "viewer123"; // pass read
 
-export const createStream = async (inputUrl: string, isRecording: boolean) => {
+export const createStream = async (
+  inputUrl: string,
+  isRecording: boolean | null
+) => {
   try {
     const response = await axios.post(
       // `http://${MTX_HOST}:${MTX_PORT}/api/streams`,

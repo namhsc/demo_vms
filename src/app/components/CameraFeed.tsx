@@ -119,7 +119,7 @@ export function LiveviewFeed({
   const containerRef = useRef<HTMLDivElement>(null);
   const videoContentRef = useRef<HTMLDivElement>(null);
   const [isRecording, setIsRecording] = useState<boolean>(initialRecord);
-  const [isRecord, setIsRecord] = useState<boolean>(initialRecord);
+  const [isRecord, setIsRecord] = useState<boolean | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -203,6 +203,7 @@ export function LiveviewFeed({
     if (!rtspUrl || rtspUrl.trim() === "") {
       return;
     }
+
     let retryTimer: number | null = null;
 
     const MAX_RETRY = 3;
@@ -214,11 +215,16 @@ export function LiveviewFeed({
       toast.warning("Invalid RTSP URL format");
       return;
     }
+
     setIsSettingsOpen(false);
 
     const updatedCameras = cameras.map((item) => {
       if (item.i === id) {
-        return { ...item, url: rtspUrl, isRecording };
+        return {
+          ...item,
+          url: rtspUrl,
+          isRecording: isRecord ? true : false,
+        };
       } else {
         return { ...item };
       }
@@ -226,11 +232,11 @@ export function LiveviewFeed({
     setCameras(updatedCameras);
 
     localStorage.setItem("cameraLayout", JSON.stringify(updatedCameras));
-
+    console.log("isRecord", isRecord);
     const fetchStream = async () => {
       try {
         attempt++;
-        const data = await createStream(rtspUrl, isRecording);
+        const data = await createStream(rtspUrl, isRecord);
 
         if (data?.whepUrl) {
           setCurrentUrl(data.whepUrl);
