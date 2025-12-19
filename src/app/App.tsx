@@ -211,7 +211,16 @@ function App() {
       setSegmentsByCameraId((prev) => {
         const next = { ...prev };
         results.forEach((r) => {
-          next[r.cameraId] = { ...next[r.cameraId], segment: r.segments };
+          if (r.segments.length === 0) {
+            next[r.cameraId] = {
+              ...next[r.cameraId],
+              segment: [],
+              record: false,
+              idRecord: "",
+            };
+          } else {
+            next[r.cameraId] = { ...next[r.cameraId], segment: r.segments };
+          }
         });
         return next;
       });

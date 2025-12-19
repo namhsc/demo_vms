@@ -304,6 +304,25 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
       }
     };
 
+    const containerDivRef = useRef<HTMLDivElement>(null);
+    const [containerSize, setContainerSize] = useState({
+      width: 0,
+      height: 0,
+    });
+
+    useEffect(() => {
+      if (!containerDivRef.current) return;
+
+      const observer = new ResizeObserver(([entry]) => {
+        const { width, height } = entry.contentRect;
+        setContainerSize({ width, height });
+      });
+
+      observer.observe(containerDivRef.current);
+
+      return () => observer.disconnect();
+    }, []);
+
     return (
       <div
         className={`flex flex-col h-full bg-slate-900 rounded-lg overflow-hidden relative transition-all duration-300 ${
@@ -378,37 +397,43 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
           >
             {({ zoomIn, zoomOut, resetTransform }) => (
               <>
-                <TransformComponent
-                  wrapperClass="w-full h-full"
-                  contentClass="w-full h-full flex items-center justify-center"
-                >
-                  <div
-                    className="relative w-full h-full flex items-center justify-center cursor-pointer"
-                    onClick={handleClick}
+                <div className="h-full absolute inset-0" ref={containerDivRef}>
+                  <TransformComponent
+                    wrapperClass="w-full h-full"
+                    contentClass="w-full h-full flex items-center justify-center"
                   >
-                    <div className="absolute inset-0">
-                      <img
-                        src={generatePattern()}
-                        alt={`Camera ${name}`}
-                        className="w-full h-full object-cover"
+                    <div
+                      className="relative w-full h-full flex items-center justify-center cursor-pointer"
+                      onClick={handleClick}
+                      style={{
+                        width: containerSize.width,
+                        height: containerSize.height,
+                      }}
+                    >
+                      <div className="absolute inset-0">
+                        <img
+                          src={generatePattern()}
+                          alt={`Camera ${name}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <video
+                        ref={videoRef}
+                        autoPlay={false}
+                        src={urlPlayback}
+                        playsInline
+                        muted
+                        controls={false}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          zIndex: 2,
+                        }}
                       />
                     </div>
-                    <video
-                      ref={videoRef}
-                      autoPlay={false}
-                      src={urlPlayback}
-                      playsInline
-                      muted
-                      controls={false}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                        zIndex: 2,
-                      }}
-                    />
-                  </div>
-                </TransformComponent>
+                  </TransformComponent>
+                </div>
 
                 {/* Zoom Controls */}
                 {showZoomControls && (
