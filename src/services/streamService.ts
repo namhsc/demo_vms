@@ -28,3 +28,18 @@ export const createStream = async (inputUrl: string) => {
     throw error.response?.data || error.message;
   }
 };
+
+export const getListStream = async (camId: string) => {
+  try {
+    const response = await axios.get(
+      `http://192.168.17.43:8999/api/videos?cameraId=cam_record_02&date=2025-12-19`,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    return response.data;
+  } catch (error: any) {
+    throw error.response?.data || error.message;
+  }
+};

@@ -30,7 +30,7 @@ interface CameraFeedProps {
 }
 
 // Generate a random pattern for mock video feed
-const generatePattern = () => {
+export const generatePattern = () => {
   const canvas = document.createElement("canvas");
   canvas.width = 640;
   canvas.height = 480;

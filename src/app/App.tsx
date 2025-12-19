@@ -7,6 +7,8 @@ import { Grid3x3, RotateCcw, Video, Radio, History } from "lucide-react";
 import { Layout } from "react-grid-layout";
 import demoVideo from "../assets/video.mp4";
 import { Toaster } from "sonner";
+import { PlaybackFeedHandle } from "./components/PlaybackFeed";
+import { getListStream } from "../services/streamService";
 
 export interface Camera {
   i: string;
@@ -24,7 +26,7 @@ export interface VideoSegment {
   index: number;
   start: number; // seconds
   end: number; // seconds
-  label: string; // hiển thị UI
+  src: string; // video source URL
 }
 
 const SEGMENT_GAP_SECONDS = 30 * 60; // 30 phút
@@ -48,7 +50,7 @@ const createSegmentsForCamera = (
       index,
       start,
       end,
-      label: `Segment ${index + 1} (${Math.floor(start / 60)}m)`,
+      src: demoVideo,
     });
 
     start = end + SEGMENT_GAP_SECONDS;
@@ -97,8 +99,7 @@ function App() {
   >(null);
 
   // Playback state
-  const [isPlaying, setIsPlaying] = useState(false);
-  // const [currentTime, setCurrentTime] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState("00:00");
@@ -157,27 +158,26 @@ function App() {
     setActivePlaybackCamera(id);
   };
 
-  const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
-  };
-
   const handleSeek = (time: number) => {
-    setCurrentTime(time);
+    // setCurrentTime(time);
   };
 
   const handleSkip = (seconds: number) => {
-    const newTime = Math.min(Math.max(currentTime + seconds, 0), duration);
-    setCurrentTime(newTime);
+    // const newTime = Math.min(Math.max(currentTime + seconds, 0), duration);
+    // setCurrentTime(newTime);
   };
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
   const [segments, setSegments] = useState<VideoSegment[]>([]);
-  const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(
-    null
-  );
+  const [globalPlaybackState, setGlobalPlaybackState] = useState({
+    currentTime: 0,
+    speed: 1.0,
+    activeSegment: 0,
+    isPlaying: false,
+    // duration: 0,
+  });
 
   useEffect(() => {
     const video = videoRef.current;
@@ -189,50 +189,46 @@ function App() {
       const durationSeconds = video.duration;
 
       setCameras((prev) => {
-        return prev.map((item, index) => ({
-          ...item,
-          segments: createSegmentsForCamera(
-            durationSeconds,
-            index * CAMERA_OFFSET_SECONDS // lệch 10 phút mỗi camera
-          ),
-        }));
+        return prev.map((item, index) => {
+          if (item.i === "cam-2") {
+            getListStream("cam_record_02").then((data) => {
+              console.log("Data video list:", data);
+            });
+          }
+          return {
+            ...item,
+            segments: createSegmentsForCamera(
+              durationSeconds,
+              index * CAMERA_OFFSET_SECONDS // lệch 10 phút mỗi camera
+            ),
+          };
+        });
       });
-
       setDuration(durationSeconds);
-    };
-
-    video.ontimeupdate = () => {
-      setCurrentTime(video.currentTime);
     };
   }, []);
 
-  useEffect(() => {
-    const active = segments.find(
-      (s) => currentTime >= s.start && currentTime < s.end
-    );
-
-    if (active && active.index !== activeSegmentIndex) {
-      setActiveSegmentIndex(active.index);
-    }
-  }, [currentTime, segments]);
-
   // Simulate playback time (in real app, this would come from video element)
   useEffect(() => {
-    if (!isPlaying || viewMode !== "playback") return;
+    if (viewMode !== "playback") return;
+    setCurrentTime((prev) => {
+      return globalPlaybackState.currentTime;
+    });
+  }, [globalPlaybackState, viewMode]);
 
-    const interval = setInterval(() => {
-      setCurrentTime((prev) => {
-        const next = prev + playbackSpeed;
-        if (next >= duration) {
-          setIsPlaying(false);
-          return duration;
-        }
-        return next;
-      });
-    }, 1000);
+  const cameraRefs = useRef<Record<string, PlaybackFeedHandle | null>>({});
 
-    return () => clearInterval(interval);
-  }, [isPlaying, playbackSpeed, duration, viewMode]);
+  const handlePlayPause = () => {
+    if (!activePlaybackCamera) return;
+    const ref = cameraRefs.current[activePlaybackCamera];
+    if (!ref) return;
+
+    if (globalPlaybackState.isPlaying) {
+      ref.pause();
+    } else {
+      ref.play();
+    }
+  };
 
   useEffect(() => {
     const findSegment = cameras.find((cam) => cam.i === activePlaybackCamera);
@@ -359,19 +355,16 @@ function App() {
                     activeCameraId={
                       viewMode === "playback" ? activePlaybackCamera : undefined
                     }
-                    playbackState={
-                      viewMode === "playback"
-                        ? { isPlaying, currentTime }
-                        : undefined
-                    }
                     mode={viewMode}
                     setCameras={setCameras}
+                    setGlobalPlaybackState={setGlobalPlaybackState}
+                    cameraRefs={cameraRefs}
                   />
                 </div>
                 {viewMode === "playback" && (
                   <PlaybackControls
                     segments={segments}
-                    isPlaying={isPlaying}
+                    isPlaying={globalPlaybackState.isPlaying}
                     currentTime={currentTime}
                     duration={duration}
                     playbackSpeed={playbackSpeed}

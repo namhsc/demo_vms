@@ -1,6 +1,6 @@
 import GridLayout, { Layout } from "react-grid-layout";
 import { LiveviewFeed } from "./CameraFeed";
-import { PlaybackFeed } from "./PlaybackFeed";
+import { PlaybackFeed, PlaybackFeedHandle } from "./PlaybackFeed";
 import "react-grid-layout/css/styles.css";
 import { Camera } from "../App";
 import React from "react";
@@ -12,14 +12,20 @@ interface CameraGridProps {
   onToggleCamera?: (id: string) => void;
   onSelectCamera?: (id: string) => void;
   activeCameraId?: string | null;
-  playbackState?: {
-    isPlaying: boolean;
-    currentTime: number;
-  };
+
   mode?: "liveview" | "playback";
   cols?: number;
   rowHeight?: number;
   setCameras: React.Dispatch<React.SetStateAction<Camera[]>>;
+  setGlobalPlaybackState: React.Dispatch<
+    React.SetStateAction<{
+      currentTime: number;
+      speed: number;
+      activeSegment: number;
+      isPlaying: boolean;
+    }>
+  >;
+  cameraRefs: React.MutableRefObject<Record<string, PlaybackFeedHandle | null>>;
 }
 
 export function CameraGrid({
@@ -29,9 +35,10 @@ export function CameraGrid({
   onToggleCamera,
   onSelectCamera,
   activeCameraId,
-  playbackState,
   mode = "liveview",
   setCameras,
+  setGlobalPlaybackState,
+  cameraRefs,
 }: CameraGridProps) {
   // Filter out hidden cameras
   const visibleCameras = cameras.filter((camera) => !camera.hidden);
@@ -85,9 +92,11 @@ export function CameraGrid({
                 onRemove={onRemoveCamera}
                 onSelect={onSelectCamera}
                 isActive={activeCameraId === camera.i}
-                currentTime={playbackState?.currentTime}
-                isPlaying={playbackState?.isPlaying}
-                url={"http://192.168.17.43:8889/cam1/whep"}
+                setGlobalPlaybackState={setGlobalPlaybackState}
+                segements={camera.segments || []}
+                ref={(el) => {
+                  cameraRefs.current[camera.i] = el;
+                }}
               />
             )}
           </div>
