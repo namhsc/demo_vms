@@ -5,7 +5,7 @@ import { DAY_SECONDS, PlaybackControls } from "./components/PlaybackControls";
 import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Grid3x3, RotateCcw, Video, Radio, History } from "lucide-react";
 import { Layout } from "react-grid-layout";
-import demoVideo from "../assets/video.mp4";
+// import demoVideo from "../assets/video.mp4";
 import { Toaster } from "sonner";
 import { PlaybackFeedHandle } from "./components/PlaybackFeed";
 import {
@@ -53,7 +53,7 @@ const createSegmentsForCamera = (
       index,
       start,
       end,
-      src: demoVideo,
+      src: "11",
     });
 
     start = end + SEGMENT_GAP_SECONDS;
@@ -447,14 +447,14 @@ function App() {
             </div>
           </div>
         </footer>
-        <video
+        {/* <video
           ref={videoRef}
           src={demoVideo}
           muted
           playsInline
           className="w-full h-full object-cover"
           style={{ display: "none" }}
-        />
+        /> */}
       </div>
       <Toaster position="top-right" richColors closeButton duration={3000} />
     </>

@@ -7,7 +7,7 @@ import React, {
   useMemo,
 } from "react";
 import { X } from "lucide-react";
-import demoVideo from "../../assets/video.mp4";
+// import demoVideo from "../../assets/video.mp4";
 import { generatePattern } from "./CameraFeed";
 import { VideoSegment } from "../App";
 
@@ -113,7 +113,7 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
           setActiveSegmentIndex(segIndex);
           setSegmentLocalTime(local);
 
-          videoRef.current.src = seg.src ?? demoVideo; // hoặc seg.src
+          videoRef.current.src = seg.src ?? ""; // hoặc seg.src
           videoRef.current.currentTime = local;
 
           if (isPlaying) {
@@ -255,10 +255,9 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
     }, [segements, activeSegmentIndex, isActive]);
 
     const urlPlayback = useMemo(() => {
-      if (segements.length === 0) return demoVideo;
+      if (segements.length === 0) return "";
       return (
-        "http://192.168.17.43:8999/" + segements[activeSegmentIndex]?.src ||
-        demoVideo
+        "http://192.168.17.43:8999/" + segements[activeSegmentIndex]?.src || ""
       );
     }, [segements, activeSegmentIndex]);
 
