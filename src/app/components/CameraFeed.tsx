@@ -120,6 +120,7 @@ export function LiveviewFeed({
   const videoContentRef = useRef<HTMLDivElement>(null);
   const [isRecording, setIsRecording] = useState<boolean>(initialRecord);
   const [isRecord, setIsRecord] = useState<boolean | null>(null);
+  const [bgImage, setBgImage] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -128,20 +129,6 @@ export function LiveviewFeed({
 
     return () => clearInterval(interval);
   }, []);
-
-  // Handle video pause/play
-  useEffect(() => {
-    const video = videoRef.current as HTMLVideoElement | null;
-    if (!video) return;
-
-    if (isPaused) {
-      video.pause();
-    } else if (isLive) {
-      video.play().catch((err) => {
-        console.warn("Play failed:", err);
-      });
-    }
-  }, [isPaused, isLive]);
 
   // Listen for fullscreen changes
   useEffect(() => {
@@ -190,7 +177,7 @@ export function LiveviewFeed({
     }
   };
 
-  const videoRef = useRef(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [reloadCounter, setReloadCounter] = useState(0);
   // Update URL when initialUrl changes
   useEffect(() => {
@@ -198,6 +185,70 @@ export function LiveviewFeed({
       setRtspUrl(initialUrl);
     }
   }, [initialUrl]);
+
+  const captureVideoFrame = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = canvas.toDataURL("image/png");
+    setBgImage(imageData);
+    setCurrentUrl("");
+  };
+
+  const handlePause = () => {
+    captureVideoFrame();
+    setIsPaused(true);
+  };
+
+  const handlePlay = () => {
+    let attempt = 0;
+    const MAX_RETRY = 3;
+    let retryTimer: number | null = null;
+
+    const fetchStream = async () => {
+      try {
+        attempt++;
+        const data = await createStream(rtspUrl, isRecord);
+
+        if (data?.whepUrl) {
+          setCurrentUrl(data.whepUrl);
+          setIsPaused(false);
+
+          setSegmentsByCameraId((prev) => ({
+            ...prev,
+            [id]: {
+              ...prev[id],
+              idRecord: data.pathName || "",
+              record: data.record,
+            },
+          }));
+          return;
+        }
+
+        throw new Error("Server returned no WHEP URL");
+      } catch (err) {
+        console.error(`CreateStream failed (attempt ${attempt}):`, err);
+        if (attempt < MAX_RETRY) {
+          retryTimer = window.setTimeout(fetchStream, 5000);
+        } else {
+          toast.error("Max retry exceeded");
+
+          setCurrentUrl("");
+        }
+      }
+    };
+
+    fetchStream();
+  };
 
   useEffect(() => {
     if (!rtspUrl || rtspUrl.trim() === "") {
@@ -315,10 +366,10 @@ export function LiveviewFeed({
         await pc.setLocalDescription(offer);
 
         const authHeader = "Basic " + btoa(`${VIEWER_USER}:${VIEWER_PASS}`);
-        // const urlgetWhep = `http://${MTX_HOST}:${MTX_PORT}${currentUrl}`;
+        const urlgetWhep = `http://${MTX_HOST}:${MTX_PORT}${currentUrl}`;
 
-        // const response = await fetch(urlgetWhep, {
-        const response = await fetch(currentUrl, {
+        const response = await fetch(urlgetWhep, {
+          // const response = await fetch(currentUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/sdp",
@@ -473,9 +524,10 @@ export function LiveviewFeed({
                   >
                     <div className="absolute inset-0">
                       <img
-                        src={generatePattern()}
+                        src={bgImage || generatePattern()}
                         alt={`Camera ${name}`}
                         className="w-full h-full object-cover"
+                        style={{ objectFit: "fill" }}
                       />
                     </div>
                     <video
@@ -489,6 +541,7 @@ export function LiveviewFeed({
                         height: "100%",
                         objectFit: "fill",
                         zIndex: 2,
+                        display: isPaused ? "none" : "block",
                       }}
                     />
                   </div>
@@ -553,7 +606,9 @@ export function LiveviewFeed({
                         <div className="flex items-center justify-between gap-2">
                           {/* Left Controls - Play/Pause */}
                           <button
-                            onClick={() => setIsPaused(!isPaused)}
+                            onClick={() =>
+                              isPaused ? handlePlay() : handlePause()
+                            }
                             className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
                             title={isPaused ? "Play" : "Pause"}
                           >

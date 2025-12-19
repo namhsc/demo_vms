@@ -427,7 +427,7 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
                         style={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "contain",
+                          objectFit: "fill",
                           zIndex: 2,
                         }}
                       />
