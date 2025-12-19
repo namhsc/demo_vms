@@ -187,9 +187,8 @@ export function LiveviewFeed({
       }
     });
     setCameras(updatedCameras);
-    const camerasToSave = updatedCameras.map(({ segments, ...rest }) => rest);
 
-    localStorage.setItem("cameraLayout", JSON.stringify(camerasToSave));
+    localStorage.setItem("cameraLayout", JSON.stringify(updatedCameras));
 
     const fetchStream = async () => {
       try {

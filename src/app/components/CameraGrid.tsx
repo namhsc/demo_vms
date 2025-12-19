@@ -2,7 +2,7 @@ import GridLayout, { Layout } from "react-grid-layout";
 import { LiveviewFeed } from "./CameraFeed";
 import { PlaybackFeed, PlaybackFeedHandle } from "./PlaybackFeed";
 import "react-grid-layout/css/styles.css";
-import { Camera } from "../App";
+import { Camera, VideoSegment } from "../App";
 import React from "react";
 
 interface CameraGridProps {
@@ -26,6 +26,7 @@ interface CameraGridProps {
     }>
   >;
   cameraRefs: React.MutableRefObject<Record<string, PlaybackFeedHandle | null>>;
+  segmentsByCameraId: Record<string, VideoSegment[]>;
 }
 
 export function CameraGrid({
@@ -39,6 +40,7 @@ export function CameraGrid({
   setCameras,
   setGlobalPlaybackState,
   cameraRefs,
+  segmentsByCameraId,
 }: CameraGridProps) {
   // Filter out hidden cameras
   const visibleCameras = cameras.filter((camera) => !camera.hidden);
@@ -93,7 +95,7 @@ export function CameraGrid({
                 onSelect={onSelectCamera}
                 isActive={activeCameraId === camera.i}
                 setGlobalPlaybackState={setGlobalPlaybackState}
-                segements={camera.segments || []}
+                segements={segmentsByCameraId[camera.i] || []}
                 ref={(el) => {
                   cameraRefs.current[camera.i] = el;
                 }}

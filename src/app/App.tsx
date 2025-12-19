@@ -8,7 +8,10 @@ import { Layout } from "react-grid-layout";
 import demoVideo from "../assets/video.mp4";
 import { Toaster } from "sonner";
 import { PlaybackFeedHandle } from "./components/PlaybackFeed";
-import { getListStream } from "../services/streamService";
+import {
+  createSegmentsFromRecordList,
+  getListStream,
+} from "../services/streamService";
 
 export interface Camera {
   i: string;
@@ -19,7 +22,7 @@ export interface Camera {
   name: string;
   hidden?: boolean;
   url?: string;
-  segments?: VideoSegment[];
+  // segments?: VideoSegment[];
 }
 
 export interface VideoSegment {
@@ -122,10 +125,8 @@ function App() {
     const updatedCameras = cameras.map((camera) => {
       const layoutItem = layout.find((item) => item.i === camera.i);
       if (layoutItem) {
-        const { segments, ...cameraWithoutSegments } = camera as any;
-
         return {
-          ...cameraWithoutSegments,
+          ...camera,
           x: layoutItem.x,
           y: layoutItem.y,
           w: layoutItem.w,
@@ -169,43 +170,80 @@ function App() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const [duration, setDuration] = useState(0);
+  // const [duration, setDuration] = useState(0);
   const [segments, setSegments] = useState<VideoSegment[]>([]);
   const [globalPlaybackState, setGlobalPlaybackState] = useState({
     currentTime: 0,
     speed: 1.0,
     activeSegment: 0,
     isPlaying: false,
-    // duration: 0,
   });
 
+  const [segmentsByCameraId, setSegmentsByCameraId] = useState<
+    Record<string, VideoSegment[]>
+  >({});
+
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const loadSegments = async () => {
+      const camerasNeedLoad = cameras.filter(
+        (cam) => !segmentsByCameraId[cam.i]
+      );
 
-    video.src = demoVideo;
+      if (camerasNeedLoad.length === 0) return;
 
-    video.onloadedmetadata = () => {
-      const durationSeconds = video.duration;
-
-      setCameras((prev) => {
-        return prev.map((item, index) => {
-          if (item.i === "cam-2") {
-            getListStream("cam_record_02").then((data) => {
-              console.log("Data video list:", data);
-            });
-          }
+      const results = await Promise.all(
+        camerasNeedLoad.map(async (cam) => {
+          const data = await getListStream(cam.i);
           return {
-            ...item,
-            segments: createSegmentsForCamera(
-              durationSeconds,
-              index * CAMERA_OFFSET_SECONDS // lệch 10 phút mỗi camera
-            ),
+            cameraId: cam.i,
+            segments: createSegmentsFromRecordList(data.videos),
           };
+        })
+      );
+
+      setSegmentsByCameraId((prev) => {
+        const next = { ...prev };
+        results.forEach((r) => {
+          next[r.cameraId] = r.segments;
         });
+        return next;
       });
-      setDuration(durationSeconds);
     };
+
+    loadSegments();
+  }, [cameras]); // ✅ CHỈ phụ thuộc cameras
+
+  useEffect(() => {
+    // getListStream("cam_record_02").then((data) => {
+    //   console.log("Data video list:", data);
+    //   const lístSegments = createSegmentsFromRecordList(data.videos);
+    //   console.log("lístSegments", lístSegments);
+    // });
+    // const video = videoRef.current;
+    // if (!video) return;
+    // video.src = demoVideo;
+    // video.onloadedmetadata = () => {
+    // const durationSeconds = video.duration;
+    // setCameras((prev) => {
+    //   return prev.map((item, index) => {
+    //     // if (item.i === "cam-2") {
+    //       getListStream("cam_record_02").then((data) => {
+    //         console.log("Data video list:", data);
+    //         const lístSegments = createSegmentsFromRecordList(data.videos);
+    //         console.log("lístSegments", lístSegments);
+    //       });
+    //     // }
+    //     return {
+    //       ...item,
+    //       segments: createSegmentsForCamera(
+    //         durationSeconds,
+    //         index * CAMERA_OFFSET_SECONDS // lệch 10 phút mỗi camera
+    //       ),
+    //     };
+    //   });
+    // });
+    // setDuration(durationSeconds);
+    // };
   }, []);
 
   // Simulate playback time (in real app, this would come from video element)
@@ -231,9 +269,12 @@ function App() {
   };
 
   useEffect(() => {
-    const findSegment = cameras.find((cam) => cam.i === activePlaybackCamera);
-    if (!findSegment) return;
-    setSegments(findSegment.segments || []);
+    if (!activePlaybackCamera) {
+      setSegments([]);
+      return;
+    }
+    const findSegment = segmentsByCameraId[activePlaybackCamera];
+    setSegments(findSegment || []);
   }, [activePlaybackCamera]);
 
   return (
@@ -359,6 +400,7 @@ function App() {
                     setCameras={setCameras}
                     setGlobalPlaybackState={setGlobalPlaybackState}
                     cameraRefs={cameraRefs}
+                    segmentsByCameraId={segmentsByCameraId}
                   />
                 </div>
                 {viewMode === "playback" && (
@@ -366,7 +408,7 @@ function App() {
                     segments={segments}
                     isPlaying={globalPlaybackState.isPlaying}
                     currentTime={currentTime}
-                    duration={duration}
+                    // duration={duration}
                     playbackSpeed={playbackSpeed}
                     selectedDate={selectedDate}
                     selectedTime={selectedTime}

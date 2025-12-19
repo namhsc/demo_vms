@@ -4,6 +4,7 @@ import React, {
   useRef,
   forwardRef,
   useImperativeHandle,
+  useMemo,
 } from "react";
 import { X } from "lucide-react";
 import demoVideo from "../../assets/video.mp4";
@@ -253,6 +254,14 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
       };
     }, [segements, activeSegmentIndex, isActive]);
 
+    const urlPlayback = useMemo(() => {
+      if (segements.length === 0) return demoVideo;
+      return (
+        "http://192.168.17.43:8999/" + segements[activeSegmentIndex]?.src ||
+        demoVideo
+      );
+    }, [segements, activeSegmentIndex]);
+
     const goToNextSegment = () => {
       const next = activeSegmentIndex + 1;
 
@@ -359,7 +368,7 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
             <video
               ref={videoRef}
               autoPlay={false}
-              src={demoVideo}
+              src={urlPlayback}
               playsInline
               muted
               controls={false}

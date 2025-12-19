@@ -12,7 +12,7 @@ import { VideoSegment } from "../App";
 interface PlaybackControlsProps {
   isPlaying: boolean;
   currentTime: number;
-  duration: number;
+  // duration: number;
   playbackSpeed: number;
   selectedDate: Date;
   selectedTime: string;
@@ -49,7 +49,6 @@ const formatTime = (seconds: number) => {
 export function PlaybackControls({
   isPlaying,
   currentTime,
-  duration,
   playbackSpeed,
   selectedDate,
   selectedTime,
@@ -69,97 +68,94 @@ export function PlaybackControls({
 }: PlaybackControlsProps) {
   // Internal zoom state if not controlled externally
   const [internalZoomLevel, setInternalZoomLevel] = useState(1);
-  const [internalViewStart, setInternalViewStart] = useState(0);
-  const [internalViewEnd, setInternalViewEnd] = useState(duration);
+  // const [internalViewStart, setInternalViewStart] = useState(0);
+  // const [internalViewEnd, setInternalViewEnd] = useState(duration);
 
-  const zoomLevel = externalZoomLevel ?? internalZoomLevel;
-  const viewStart = externalViewStart ?? internalViewStart;
-  const viewEnd = externalViewEnd ?? internalViewEnd;
+  // const zoomLevel = externalZoomLevel ?? internalZoomLevel;
+  // const viewStart = externalViewStart ?? internalViewStart;
+  // const viewEnd = externalViewEnd ?? internalViewEnd;
 
   const timelineRef = useRef<HTMLDivElement>(null);
 
-  // Calculate visible duration based on zoom
-  const visibleDuration = viewEnd - viewStart;
-  const zoomStep = 0.1;
-  const minZoom = 0.5; // Show 2x duration
-  const maxZoom = 10; // Show 1/10 duration
+  // // Calculate visible duration based on zoom
+  // const visibleDuration = viewEnd - viewStart;
+  // const zoomStep = 0.1;
+  // const minZoom = 0.5; // Show 2x duration
+  // const maxZoom = 10; // Show 1/10 duration
 
   const handleZoomIn = () => {
-    const newZoom = Math.min(zoomLevel + zoomStep, maxZoom);
-    updateZoom(newZoom);
+    // const newZoom = Math.min(zoomLevel + zoomStep, maxZoom);
+    // updateZoom(newZoom);
   };
 
   const handleZoomOut = () => {
-    const newZoom = Math.max(zoomLevel - zoomStep, minZoom);
-    updateZoom(newZoom);
+    // const newZoom = Math.max(zoomLevel - zoomStep, minZoom);
+    // updateZoom(newZoom);
   };
 
   const updateZoom = (newZoom: number) => {
     // Calculate new view range centered on current time
-    const center = currentTime;
-    const newVisibleDuration = duration / newZoom;
-    const halfDuration = newVisibleDuration / 2;
-    let newStart = Math.max(0, center - halfDuration);
-    let newEnd = Math.min(duration, center + halfDuration);
-
-    // Adjust if we hit boundaries
-    if (newEnd >= duration) {
-      newEnd = duration;
-      newStart = Math.max(0, duration - newVisibleDuration);
-    }
-    if (newStart <= 0) {
-      newStart = 0;
-      newEnd = Math.min(duration, newVisibleDuration);
-    }
-
-    if (onZoomChange) {
-      onZoomChange(newZoom);
-    } else {
-      setInternalZoomLevel(newZoom);
-    }
-
-    if (onViewChange) {
-      onViewChange(newStart, newEnd);
-    } else {
-      setInternalViewStart(newStart);
-      setInternalViewEnd(newEnd);
-    }
+    // const center = currentTime;
+    // const newVisibleDuration = duration / newZoom;
+    // const halfDuration = newVisibleDuration / 2;
+    // let newStart = Math.max(0, center - halfDuration);
+    // let newEnd = Math.min(duration, center + halfDuration);
+    // // Adjust if we hit boundaries
+    // if (newEnd >= duration) {
+    //   newEnd = duration;
+    //   newStart = Math.max(0, duration - newVisibleDuration);
+    // }
+    // if (newStart <= 0) {
+    //   newStart = 0;
+    //   newEnd = Math.min(duration, newVisibleDuration);
+    // }
+    // if (onZoomChange) {
+    //   onZoomChange(newZoom);
+    // } else {
+    //   setInternalZoomLevel(newZoom);
+    // }
+    // if (onViewChange) {
+    //   onViewChange(newStart, newEnd);
+    // } else {
+    //   setInternalViewStart(newStart);
+    //   setInternalViewEnd(newEnd);
+    // }
   };
 
   // Update view when currentTime changes to keep it in view (only if seeking)
-  useEffect(() => {
-    const margin = visibleDuration * 0.1; // 10% margin
-    if (currentTime < viewStart + margin || currentTime > viewEnd - margin) {
-      const center = currentTime;
-      const currentVisibleDuration = viewEnd - viewStart;
-      const halfDuration = currentVisibleDuration / 2;
-      let newStart = Math.max(0, center - halfDuration);
-      let newEnd = Math.min(duration, center + halfDuration);
+  // useEffect(() => {
+  //   const margin = visibleDuration * 0.1; // 10% margin
+  //   if (currentTime < viewStart + margin || currentTime > viewEnd - margin) {
+  //     const center = currentTime;
+  //     const currentVisibleDuration = viewEnd - viewStart;
+  //     const halfDuration = currentVisibleDuration / 2;
+  //     let newStart = Math.max(0, center - halfDuration);
+  //     let newEnd = Math.min(duration, center + halfDuration);
 
-      if (newEnd >= duration) {
-        newEnd = duration;
-        newStart = Math.max(0, duration - currentVisibleDuration);
-      }
-      if (newStart <= 0) {
-        newStart = 0;
-        newEnd = Math.min(duration, currentVisibleDuration);
-      }
+  //     if (newEnd >= duration) {
+  //       newEnd = duration;
+  //       newStart = Math.max(0, duration - currentVisibleDuration);
+  //     }
+  //     if (newStart <= 0) {
+  //       newStart = 0;
+  //       newEnd = Math.min(duration, currentVisibleDuration);
+  //     }
 
-      // Only update if there's a significant change to avoid loops
-      if (
-        Math.abs(newStart - viewStart) > 1 ||
-        Math.abs(newEnd - viewEnd) > 1
-      ) {
-        if (onViewChange) {
-          onViewChange(newStart, newEnd);
-        } else {
-          setInternalViewStart(newStart);
-          setInternalViewEnd(newEnd);
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTime]);
+  //     // Only update if there's a significant change to avoid loops
+  //     if (
+  //       Math.abs(newStart - viewStart) > 1 ||
+  //       Math.abs(newEnd - viewEnd) > 1
+  //     ) {
+  //       if (onViewChange) {
+  //         onViewChange(newStart, newEnd);
+  //       } else {
+  //         setInternalViewStart(newStart);
+  //         setInternalViewEnd(newEnd);
+  //       }
+  //     }
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [currentTime]);
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
