@@ -264,6 +264,12 @@ function App() {
     if (!ref) return;
     ref.nextSegment();
   };
+  const seekToGlobalTime = (time: number) => {
+    if (!activePlaybackCamera) return;
+    const ref = cameraRefs.current[activePlaybackCamera];
+    if (!ref) return;
+    ref.seekToGlobalTime(time);
+  };
 
   useEffect(() => {
     if (!activePlaybackCamera) {
@@ -428,6 +434,7 @@ function App() {
                       setViewStart(start);
                       setViewEnd(end);
                     }}
+                    seekToGlobalTime={seekToGlobalTime}
                   />
                 )}
               </div>

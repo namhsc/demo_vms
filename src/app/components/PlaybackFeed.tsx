@@ -71,6 +71,33 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
     const [segmentLocalTime, setSegmentLocalTime] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
 
+    const findBestSegmentIndex = (timing: number) => {
+      // 1. Ưu tiên segment chứa timing
+      const exactIndex = segements.findIndex(
+        (s) => timing >= s.start && timing <= s.end
+      );
+
+      if (exactIndex !== -1) return exactIndex;
+
+      // 2. Nếu không có → tìm segment gần nhất
+      let closestIndex = 0;
+      let minDistance = Infinity;
+
+      segements.forEach((s, i) => {
+        const dist = Math.min(
+          Math.abs(timing - s.start),
+          Math.abs(timing - s.end)
+        );
+
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestIndex = i;
+        }
+      });
+
+      return closestIndex;
+    };
+
     /* ---------- expose API cho component cha ---------- */
     useImperativeHandle(
       ref,
@@ -114,35 +141,56 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
           if (isActive) changeSegment(1);
         },
 
-        seekToGlobalTime(globalTime: number) {
-          if (!videoRef.current || segements.length === 0) return;
-          console.log("globalTime", globalTime);
-          return;
-          // const segIndex = segements.findIndex(
-          //   (s) => globalTime >= s.start && globalTime < s.end
-          // );
-          // if (segIndex === -1) return;
+        seekToGlobalTime(timing: number) {
+          const video = videoRef.current;
+          if (!video || segements.length === 0) return;
 
-          // const seg = segements[segIndex];
-          // const local = globalTime - seg.start;
+          // 1️⃣ tìm segment phù hợp
+          const targetIndex = findBestSegmentIndex(timing);
+          const segment = segements[targetIndex];
+          if (!segment) return;
 
-          // setActiveSegmentIndex(segIndex);
-          // setSegmentLocalTime(local);
+          // 2️⃣ tính localTime trong video
+          const localTime = Math.max(0, timing - segment.start);
 
-          // videoRef.current.src = seg.src ?? ""; // hoặc seg.src
-          // videoRef.current.currentTime = local;
+          // 3️⃣ đổi segment nếu cần
+          if (targetIndex !== activeSegmentIndex) {
+            setActiveSegmentIndex(targetIndex);
+            setSegmentLocalTime(localTime);
 
-          // if (isPlaying) {
-          //   videoRef.current.play();
-          // }
+            // load video mới
+            video.pause();
+            video.src = segment.src;
+            video.load();
 
-          // if (isActive) {
-          //   setGlobalPlaybackState((prev) => ({
-          //     ...prev,
-          //     currentTime: globalTime,
-          //     activeSegment: segIndex,
-          //   }));
-          // }
+            const onLoaded = () => {
+              video.currentTime = localTime;
+
+              if (isPlaying) {
+                video.play().catch(() => {});
+              }
+
+              video.removeEventListener("loadedmetadata", onLoaded);
+            };
+
+            video.addEventListener("loadedmetadata", onLoaded);
+          } else {
+            // cùng segment → chỉ seek
+            video.currentTime = localTime;
+            setSegmentLocalTime(localTime);
+          }
+
+          // 4️⃣ update global nếu camera active
+          if (isActive) {
+            setIsPlaying(true);
+            setGlobalPlaybackState((prev) => ({
+              ...prev,
+              currentTime: timing,
+              activeSegment: targetIndex,
+              speed,
+              isPlaying: true,
+            }));
+          }
         },
 
         setSpeed(newSpeed: number) {
@@ -264,9 +312,6 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
             activeSegment: activeSegmentIndex,
           }));
         }
-        // console.log("localTime", localTime);
-        // console.log("activeSegmentIndex", activeSegmentIndex);
-        // console.log("duration", video.duration);
 
         // nếu hết file video → chuyển sang segment tiếp theo
         if (localTime >= video.duration - 0.5) {

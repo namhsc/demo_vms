@@ -99,6 +99,8 @@ export function LiveviewFeed({
   const [scaleZoom, setScaleZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [isRecord, setIsRecord] = useState<boolean>(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -183,7 +185,7 @@ export function LiveviewFeed({
 
     const updatedCameras = cameras.map((item) => {
       if (item.i === id) {
-        return { ...item, url: rtspUrl };
+        return { ...item, url: rtspUrl, isRecording };
       } else {
         return { ...item };
       }
@@ -195,7 +197,7 @@ export function LiveviewFeed({
     const fetchStream = async () => {
       try {
         attempt++;
-        const data = await createStream(rtspUrl);
+        const data = await createStream(rtspUrl, isRecording);
 
         if (data?.whepUrl) {
           setCurrentUrl(data.whepUrl);
@@ -220,10 +222,11 @@ export function LiveviewFeed({
     return () => {
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [rtspUrl]);
+  }, [rtspUrl, isRecord]);
 
   const handleApplySettings = () => {
     setRtspUrl(rtspUrlInput);
+    setIsRecord(isRecording);
   };
 
   useEffect(() => {
@@ -554,6 +557,48 @@ export function LiveviewFeed({
                 onChange={(e) => setRtspUrlInput(e.target.value)}
                 className="bg-slate-700 text-white border-slate-600 focus:border-blue-500"
               />
+            </div>
+          </div>
+          <div className="flex items-center justify-between px-3 py-2 bg-slate-700/40 rounded-lg border border-slate-600">
+            <div className="flex flex-col">
+              <span className="text-sm text-white font-medium">
+                Ghi hình (Recording)
+              </span>
+              <span className="text-xs text-slate-400">
+                Bật để lưu video playback cho camera này
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-xs font-medium ${
+                  isRecording ? "text-red-400" : "text-slate-400"
+                }`}
+              >
+                {isRecording ? "ON" : "OFF"}
+              </span>
+
+              {/* Switch */}
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isRecording}
+                  onChange={(e) => setIsRecording(e.target.checked)}
+                  className="sr-only"
+                />
+                <div
+                  className={`
+          w-10 h-5 rounded-full transition-colors duration-200
+          ${isRecording ? "bg-red-600" : "bg-slate-500"}
+        `}
+                />
+                <div
+                  className={`
+          absolute left-1 top-1 w-3 h-3 rounded-full bg-white transition-transform duration-200
+          ${isRecording ? "translate-x-5" : "translate-x-0"}
+        `}
+                />
+              </label>
             </div>
           </div>
           <DialogFooter>

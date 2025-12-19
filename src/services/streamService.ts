@@ -2,14 +2,14 @@ import axios from "axios";
 import { VideoSegment } from "../app/App";
 
 export const MTX_HOST = "192.168.17.43"; // IP MediaMTX
-export const PORT = 8080; // webrtcAddress
-export const MTX_PORT = 8999; // webrtcAddress
+export const PORT = 8080;
+export const MTX_PORT = 8999;
 
 export const PATH_NAME = "p_se3qwd5idgv1t"; // path đã tạo
 export const VIEWER_USER = "viewer"; // user read
 export const VIEWER_PASS = "viewer123"; // pass read
 
-export const createStream = async (inputUrl: string) => {
+export const createStream = async (inputUrl: string, isRecording: boolean) => {
   try {
     const response = await axios.post(
       `http://${MTX_HOST}:${MTX_PORT}/api/streams`,
@@ -18,6 +18,7 @@ export const createStream = async (inputUrl: string) => {
         inputUrl,
         onDemand: true,
         rtspTransport: "tcp",
+        record: isRecording,
       },
       {
         headers: { "Content-Type": "application/json" },
@@ -33,7 +34,7 @@ export const createStream = async (inputUrl: string) => {
 export const getListStream = async (camId: string) => {
   try {
     const response = await axios.get(
-      `http://192.168.17.43:8999/api/videos?cameraId=cam_record_02&date=2025-12-19`,
+      `http://${MTX_HOST}:${MTX_PORT}/api/videos?cameraId=cam_record_02&date=2025-12-19`,
       { headers: { "Content-Type": "application/json" } }
     );
 

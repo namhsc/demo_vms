@@ -29,9 +29,12 @@ interface PlaybackControlsProps {
   viewEnd?: number;
   onViewChange?: (start: number, end: number) => void;
   segments: VideoSegment[];
+  seekToGlobalTime: (time: number) => void;
 }
 
 export const DAY_SECONDS = 86400;
+const clamp = (v: number, min: number, max: number) =>
+  v < min ? min : v > max ? max : v;
 
 // Format time for display
 const formatTime = (seconds: number) => {
@@ -65,6 +68,7 @@ export function PlaybackControls({
   viewEnd: externalViewEnd,
   onViewChange,
   segments,
+  seekToGlobalTime,
 }: PlaybackControlsProps) {
   // Internal zoom state if not controlled externally
   const [internalZoomLevel, setInternalZoomLevel] = useState(1);
@@ -166,6 +170,25 @@ export function PlaybackControls({
     }
   };
 
+  const getTimeFromTimelineClick = (e: React.MouseEvent) => {
+    const timeline = timelineRef.current;
+    if (!timeline) return null;
+
+    const rect = timeline.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percent = clickX / rect.width;
+
+    const time = clamp(percent, 0, 1) * DAY_SECONDS;
+
+    return time;
+  };
+
+  const handleTimelineClick = (e: React.MouseEvent) => {
+    const time = getTimeFromTimelineClick(e);
+    if (time == null) return;
+    seekToGlobalTime(time);
+  };
+
   return (
     <div className="bg-slate-800 border-t border-slate-700 rounded-b-xl">
       {/* Control Bar */}
@@ -241,6 +264,7 @@ export function PlaybackControls({
           className="relative mb-2"
           onWheel={handleWheel}
           style={{ width: `${internalZoomLevel * 100}%` }}
+          onClick={handleTimelineClick}
         >
           {/* Time markers */}
           <div className="relative h-8 mb-1">
