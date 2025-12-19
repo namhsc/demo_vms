@@ -12,8 +12,8 @@ export const VIEWER_PASS = "viewer123"; // pass read
 export const createStream = async (inputUrl: string, isRecording: boolean) => {
   try {
     const response = await axios.post(
-      `http://${MTX_HOST}:${MTX_PORT}/api/streams`,
-      // `/api/streams`,
+      // `http://${MTX_HOST}:${MTX_PORT}/api/streams`,
+      `/api/streams`,
       {
         inputUrl,
         onDemand: true,
@@ -32,9 +32,12 @@ export const createStream = async (inputUrl: string, isRecording: boolean) => {
 };
 
 export const getListStream = async (camId: string) => {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
   try {
     const response = await axios.get(
-      `http://${MTX_HOST}:${MTX_PORT}/api/videos?cameraId=cam_record_02&date=2025-12-19`,
+      // `http://${MTX_HOST}:${MTX_PORT}/api/videos?cameraId=${camId}&date=2025-12-19`,
+      `/api/videos?cameraId=${camId}&date=${today}`,
       { headers: { "Content-Type": "application/json" } }
     );
 

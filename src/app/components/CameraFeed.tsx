@@ -29,7 +29,7 @@ import {
   VIEWER_PASS,
   VIEWER_USER,
 } from "../../services/streamService";
-import { Camera } from "../App";
+import { Camera, VideoSegment } from "../App";
 import { toast } from "sonner";
 
 interface CameraFeedProps {
@@ -40,6 +40,19 @@ interface CameraFeedProps {
   url?: string;
   setCameras: React.Dispatch<React.SetStateAction<Camera[]>>;
   cameras: Camera[];
+  initialRecord: boolean;
+  setSegmentsByCameraId: React.Dispatch<
+    React.SetStateAction<
+      Record<
+        string,
+        {
+          segment: VideoSegment[];
+          idRecord: string;
+          record: boolean;
+        }
+      >
+    >
+  >;
 }
 
 // Generate a random pattern for mock video feed
@@ -91,6 +104,8 @@ export function LiveviewFeed({
   url: initialUrl,
   setCameras,
   cameras,
+  initialRecord = false,
+  setSegmentsByCameraId,
 }: CameraFeedProps) {
   const [isLive, setIsLive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -103,11 +118,8 @@ export function LiveviewFeed({
   const [currentUrl, setCurrentUrl] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const videoContentRef = useRef<HTMLDivElement>(null);
-  const [scaleZoom, setScaleZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [isRecord, setIsRecord] = useState<boolean>(false);
+  const [isRecording, setIsRecording] = useState<boolean>(initialRecord);
+  const [isRecord, setIsRecord] = useState<boolean>(initialRecord);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -222,6 +234,14 @@ export function LiveviewFeed({
 
         if (data?.whepUrl) {
           setCurrentUrl(data.whepUrl);
+          setSegmentsByCameraId((prev) => ({
+            ...prev,
+            [id]: {
+              ...prev[id],
+              idRecord: data.pathName || "",
+              record: data.record,
+            },
+          }));
           return;
         }
 
@@ -288,9 +308,10 @@ export function LiveviewFeed({
         await pc.setLocalDescription(offer);
 
         const authHeader = "Basic " + btoa(`${VIEWER_USER}:${VIEWER_PASS}`);
-        const urlgetWhep = `http://${MTX_HOST}:${MTX_PORT}${currentUrl}`;
+        // const urlgetWhep = `http://${MTX_HOST}:${MTX_PORT}${currentUrl}`;
 
-        const response = await fetch(urlgetWhep, {
+        // const response = await fetch(urlgetWhep, {
+        const response = await fetch(currentUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/sdp",
@@ -319,8 +340,6 @@ export function LiveviewFeed({
         await startWebRTC();
       } catch (err) {
         console.warn("Retry WebRTC in 3s...");
-
-        // Destroy PC cũ trước khi retry
         if (pc) {
           pc.getSenders().forEach((s) => s.track?.stop());
           pc.close();
@@ -343,6 +362,25 @@ export function LiveviewFeed({
       }
     };
   }, [currentUrl]);
+
+  const containerDivRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({
+    width: 0,
+    height: 0,
+  });
+
+  useEffect(() => {
+    if (!containerDivRef.current) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setContainerSize({ width, height });
+    });
+
+    observer.observe(containerDivRef.current);
+
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div
@@ -409,45 +447,46 @@ export function LiveviewFeed({
             touchPadDisabled: false,
             activationKeys: [],
           }}
-          doubleClick={{
-            disabled: false,
-            mode: "zoomIn",
-          }}
-          panning={{
-            disabled: false,
-            velocityDisabled: false,
-          }}
+          doubleClick={{ disabled: false, mode: "zoomIn" }}
+          panning={{ disabled: false, velocityDisabled: false }}
         >
           {({ zoomIn, zoomOut, resetTransform }) => (
             <>
-              <TransformComponent
-                wrapperClass="w-full h-full"
-                contentClass="w-full h-full flex items-center justify-center"
-              >
-                <div className="relative w-full h-full flex items-center justify-center">
-                  <div className="absolute inset-0">
-                    <img
-                      src={generatePattern()}
-                      alt={`Camera ${name}`}
-                      className="w-full h-full object-cover"
+              <div className="h-full absolute inset-0" ref={containerDivRef}>
+                <TransformComponent
+                  wrapperClass="w-full h-full"
+                  contentClass="w-full h-full flex items-center justify-center"
+                >
+                  <div
+                    className="relative w-full h-full flex items-center justify-center"
+                    style={{
+                      width: containerSize.width,
+                      height: containerSize.height,
+                    }}
+                  >
+                    <div className="absolute inset-0">
+                      <img
+                        src={generatePattern()}
+                        alt={`Camera ${name}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      controls={false}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "fill",
+                        zIndex: 2,
+                      }}
                     />
                   </div>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    controls={false}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                      zIndex: 2,
-                    }}
-                  />
-                </div>
-              </TransformComponent>
-
+                </TransformComponent>
+              </div>
               {/* Zoom Controls */}
               {showControls && (
                 <div className="absolute top-2 right-2 z-20 flex gap-2">

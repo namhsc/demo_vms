@@ -22,7 +22,7 @@ export interface Camera {
   name: string;
   hidden?: boolean;
   url?: string;
-  // segments?: VideoSegment[];
+  isRecording?: boolean;
 }
 
 export interface VideoSegment {
@@ -36,33 +36,33 @@ export interface VideoSegment {
 
 const SEGMENT_GAP_SECONDS = 30 * 60; // 30 phút
 
-const createSegmentsForCamera = (
-  durationSeconds: number,
-  startOffsetSeconds?: number
-): VideoSegment[] => {
-  const segments: VideoSegment[] = [];
+// const createSegmentsForCamera = (
+//   durationSeconds: number,
+//   startOffsetSeconds?: number
+// ): VideoSegment[] => {
+//   const segments: VideoSegment[] = [];
 
-  let index = 0;
-  let start = startOffsetSeconds || 0;
+//   let index = 0;
+//   let start = startOffsetSeconds || 0;
 
-  while (start < DAY_SECONDS) {
-    const end = start + durationSeconds;
+//   while (start < DAY_SECONDS) {
+//     const end = start + durationSeconds;
 
-    if (end > DAY_SECONDS) break;
+//     if (end > DAY_SECONDS) break;
 
-    segments.push({
-      index,
-      start,
-      end,
-      src: "demoVideo",
-    });
+//     segments.push({
+//       index,
+//       start,
+//       end,
+//       src: "demoVideo",
+//     });
 
-    start = end + SEGMENT_GAP_SECONDS;
-    index++;
-  }
+//     start = end + SEGMENT_GAP_SECONDS;
+//     index++;
+//   }
 
-  return segments;
-};
+//   return segments;
+// };
 
 const layoutDefault: Camera[] = [
   {
@@ -171,63 +171,54 @@ function App() {
   });
 
   const [segmentsByCameraId, setSegmentsByCameraId] = useState<
-    Record<string, VideoSegment[]>
+    Record<
+      string,
+      {
+        segment: VideoSegment[];
+        idRecord: string;
+        record: boolean;
+      }
+    >
   >({});
-
   useEffect(() => {
-    // const video = videoRef.current;
-    // if (!video) return;
-    // video.onloadedmetadata = () => {
-    //   const durationSeconds = video.duration;
-    //   const camerasNeedLoad = cameras.filter(
-    //     (cam) => !segmentsByCameraId[cam.i]
-    //   );
+    if (viewMode !== "playback") return;
 
-    //   if (camerasNeedLoad.length === 0) return;
-    //   const abc = camerasNeedLoad.map((cam) => {
-    //     return {
-    //       cameraId: cam.i,
-    //       segments: createSegmentsForCamera(durationSeconds),
-    //     };
-    //   });
-    //   setSegmentsByCameraId((prev) => {
-    //     const next = { ...prev };
-    //     abc.forEach((r) => {
-    //       next[r.cameraId] = r.segments;
-    //     });
-    //     return next;
-    //   });
-    // };
-
-    // return;
-    const loadSegments = async () => {
-      const camerasNeedLoad = cameras.filter(
-        (cam) => !segmentsByCameraId[cam.i]
+    const arr = Object.entries(segmentsByCameraId)
+      .map(([key, value]) => ({
+        id: key,
+        ...value,
+      }))
+      .filter(
+        (item) =>
+          item.record &&
+          item.idRecord &&
+          (!item.segment || item.segment.length === 0)
       );
 
-      if (camerasNeedLoad.length === 0) return;
+    if (arr.length === 0) return;
 
+    const loadSegments = async () => {
       const results = await Promise.all(
-        camerasNeedLoad.map(async (cam) => {
-          const data = await getListStream(cam.i);
+        arr.map(async (cam) => {
+          const data = await getListStream(cam.idRecord);
           return {
-            cameraId: cam.i,
+            cameraId: cam.id,
             segments: createSegmentsFromRecordList(data.videos),
           };
         })
       );
-
+      console.log("results", results);
       setSegmentsByCameraId((prev) => {
         const next = { ...prev };
         results.forEach((r) => {
-          next[r.cameraId] = r.segments;
+          next[r.cameraId] = { ...next[r.cameraId], segment: r.segments };
         });
         return next;
       });
     };
 
     loadSegments();
-  }, [cameras]); // ✅ CHỈ phụ thuộc cameras
+  }, [segmentsByCameraId, viewMode]);
 
   // Simulate playback time (in real app, this would come from video element)
   useEffect(() => {
@@ -277,7 +268,7 @@ function App() {
       return;
     }
     const findSegment = segmentsByCameraId[activePlaybackCamera];
-    setSegments(findSegment || []);
+    setSegments(findSegment?.segment || []);
   }, [activePlaybackCamera]);
 
   return (
@@ -404,6 +395,7 @@ function App() {
                     setGlobalPlaybackState={setGlobalPlaybackState}
                     cameraRefs={cameraRefs}
                     segmentsByCameraId={segmentsByCameraId}
+                    setSegmentsByCameraId={setSegmentsByCameraId}
                   />
                 </div>
                 {viewMode === "playback" && (

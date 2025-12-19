@@ -229,9 +229,6 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
             activeSegment: activeSegmentIndex,
           }));
         }
-        // console.log("localTime", localTime);
-        // console.log("activeSegmentIndex", activeSegmentIndex);
-        // console.log("duration", video.duration);
 
         // nếu hết file video → chuyển sang segment tiếp theo
         if (localTime >= video.duration - 0.5) {
@@ -242,10 +239,7 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
 
     const urlPlayback = useMemo(() => {
       if (segements.length === 0) return "";
-      // return segements[activeSegmentIndex]?.src;
-      return (
-        "http://192.168.17.43:8999/" + segements[activeSegmentIndex]?.src || ""
-      );
+      return segements[activeSegmentIndex]?.src || "";
     }, [segements, activeSegmentIndex]);
 
     const changeSegment = (input: ChangeSegmentInput) => {

@@ -26,7 +26,26 @@ interface CameraGridProps {
     }>
   >;
   cameraRefs: React.MutableRefObject<Record<string, PlaybackFeedHandle | null>>;
-  segmentsByCameraId: Record<string, VideoSegment[]>;
+  segmentsByCameraId: Record<
+    string,
+    {
+      segment: VideoSegment[];
+      idRecord: string;
+      record: boolean;
+    }
+  >;
+  setSegmentsByCameraId: React.Dispatch<
+    React.SetStateAction<
+      Record<
+        string,
+        {
+          segment: VideoSegment[];
+          idRecord: string;
+          record: boolean;
+        }
+      >
+    >
+  >;
 }
 
 export function CameraGrid({
@@ -41,6 +60,7 @@ export function CameraGrid({
   setGlobalPlaybackState,
   cameraRefs,
   segmentsByCameraId,
+  setSegmentsByCameraId,
 }: CameraGridProps) {
   // Filter out hidden cameras
   const visibleCameras = cameras.filter((camera) => !camera.hidden);
@@ -81,11 +101,13 @@ export function CameraGrid({
               <LiveviewFeed
                 id={camera.i}
                 name={camera.name}
+                initialRecord={camera.isRecording || false}
                 onRemove={onRemoveCamera}
                 onHide={onToggleCamera}
                 url={camera.url || ""}
                 setCameras={setCameras}
                 cameras={cameras}
+                setSegmentsByCameraId={setSegmentsByCameraId}
               />
             ) : (
               <PlaybackFeed
@@ -95,7 +117,7 @@ export function CameraGrid({
                 onSelect={onSelectCamera}
                 isActive={activeCameraId === camera.i}
                 setGlobalPlaybackState={setGlobalPlaybackState}
-                segements={segmentsByCameraId[camera.i] || []}
+                segements={segmentsByCameraId[camera.i]?.segment || []}
                 ref={(el) => {
                   cameraRefs.current[camera.i] = el;
                 }}
