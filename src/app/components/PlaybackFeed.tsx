@@ -1,447 +1,447 @@
 import React, {
-  useState,
-  useEffect,
-  useRef,
-  forwardRef,
-  useImperativeHandle,
-  useMemo,
-} from "react";
-import { X } from "lucide-react";
-import { generatePattern } from "./CameraFeed";
-import { VideoSegment } from "../App";
+	useState,
+	useEffect,
+	useRef,
+	forwardRef,
+	useImperativeHandle,
+	useMemo,
+} from 'react';
+import { X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { generatePattern } from './CameraFeed';
+import { VideoSegment } from '../App';
 
 interface PlaybackFeedProps {
-  id: string;
-  name: string;
-  onRemove: (id: string) => void;
-  onSelect?: (id: string) => void;
-  isActive?: boolean;
-  setGlobalPlaybackState: React.Dispatch<
-    React.SetStateAction<{
-      currentTime: number;
-      speed: number;
-      isPlaying: boolean;
-      activeSegment: number;
-    }>
-  >;
-  segements: VideoSegment[];
+	id: string;
+	name: string;
+	onRemove: (id: string) => void;
+	onSelect?: (id: string) => void;
+	isActive?: boolean;
+	setGlobalPlaybackState: React.Dispatch<
+		React.SetStateAction<{
+			currentTime: number;
+			speed: number;
+			isPlaying: boolean;
+			activeSegment: number;
+		}>
+	>;
+	segements: VideoSegment[];
 }
 
 type ChangeSegmentInput =
-  | number
-  | {
-      index: number;
-    };
+	| number
+	| {
+			index: number;
+	  };
 
 export interface PlaybackFeedHandle {
-  play: () => void;
-  pause: () => void;
-  seekToGlobalTime: (globalTime: number) => void;
-  setSpeed: (speed: number) => void;
-  nextSegment: () => void;
-  prevSegment: () => void;
+	play: () => void;
+	pause: () => void;
+	seekToGlobalTime: (globalTime: number) => void;
+	setSpeed: (speed: number) => void;
+	nextSegment: () => void;
+	prevSegment: () => void;
 }
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
 
 export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
-  (
-    {
-      id,
-      name,
-      onRemove,
-      onSelect,
-      isActive = false,
-      setGlobalPlaybackState,
-      segements,
-    },
-    ref
-  ) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const lastPos = useRef({ x: 0, y: 0 });
-    const videoContentRef = useRef<HTMLDivElement>(null);
+	(
+		{
+			id,
+			name,
+			onRemove,
+			onSelect,
+			isActive = false,
+			setGlobalPlaybackState,
+			segements,
+		},
+		ref,
+	) => {
+		const containerRef = useRef<HTMLDivElement>(null);
+		const videoRef = useRef<HTMLVideoElement>(null);
+		const videoContentRef = useRef<HTMLDivElement>(null);
+		const [showZoomControls, setShowZoomControls] = useState(false);
 
-    const [scaleZoom, setScaleZoom] = useState(1);
-    const [offset, setOffset] = useState({ x: 0, y: 0 });
-    const [isPanning, setIsPanning] = useState(false);
+		const [speed, setSpeed] = useState(1);
+		const [activeSegmentIndex, setActiveSegmentIndex] = useState(0);
+		const [segmentLocalTime, setSegmentLocalTime] = useState(0);
+		const [isPlaying, setIsPlaying] = useState(false);
 
-    const [speed, setSpeed] = useState(1);
-    const [activeSegmentIndex, setActiveSegmentIndex] = useState(0);
-    const [segmentLocalTime, setSegmentLocalTime] = useState(0);
-    const [isPlaying, setIsPlaying] = useState(false);
+		/* ---------- expose API cho component cha ---------- */
+		useImperativeHandle(
+			ref,
+			() => ({
+				play() {
+					if (!videoRef.current) return;
+					videoRef.current.play();
+					setIsPlaying(true);
 
-    /* ---------- expose API cho component cha ---------- */
-    useImperativeHandle(
-      ref,
-      () => ({
-        play() {
-          if (!videoRef.current) return;
-          videoRef.current.play();
-          setIsPlaying(true);
+					if (isActive) {
+						const seg = segements[activeSegmentIndex];
+						const globalTime = seg.start + segmentLocalTime;
+						setGlobalPlaybackState((prev) => ({
+							...prev,
+							isPlaying: true,
+							currentTime: globalTime,
+							activeSegment: activeSegmentIndex,
+							speed,
+						}));
+					}
+				},
 
-          if (isActive) {
-            const seg = segements[activeSegmentIndex];
-            const globalTime = seg.start + segmentLocalTime;
-            setGlobalPlaybackState((prev) => ({
-              ...prev,
-              isPlaying: true,
-              currentTime: globalTime,
-              activeSegment: activeSegmentIndex,
-              speed,
-            }));
-          }
-        },
+				pause() {
+					if (!videoRef.current) return;
+					videoRef.current.pause();
+					setIsPlaying(false);
 
-        pause() {
-          if (!videoRef.current) return;
-          videoRef.current.pause();
-          setIsPlaying(false);
+					if (isActive) {
+						setGlobalPlaybackState((prev) => ({
+							...prev,
+							isPlaying: false,
+						}));
+					}
+				},
 
-          if (isActive) {
-            setGlobalPlaybackState((prev) => ({
-              ...prev,
-              isPlaying: false,
-            }));
-          }
-        },
+				prevSegment() {
+					if (isActive) changeSegment(-1);
+				},
 
-        prevSegment() {
-          if (isActive) changeSegment(-1);
-        },
+				nextSegment() {
+					if (isActive) changeSegment(1);
+				},
 
-        nextSegment() {
-          if (isActive) changeSegment(1);
-        },
+				seekToGlobalTime(globalTime: number) {
+					if (!videoRef.current || segements.length === 0) return;
+					console.log('globalTime', globalTime);
+					return;
+					// const segIndex = segements.findIndex(
+					//   (s) => globalTime >= s.start && globalTime < s.end
+					// );
+					// if (segIndex === -1) return;
 
-        seekToGlobalTime(globalTime: number) {
-          if (!videoRef.current || segements.length === 0) return;
-          console.log("globalTime", globalTime);
-          return;
-          // const segIndex = segements.findIndex(
-          //   (s) => globalTime >= s.start && globalTime < s.end
-          // );
-          // if (segIndex === -1) return;
+					// const seg = segements[segIndex];
+					// const local = globalTime - seg.start;
 
-          // const seg = segements[segIndex];
-          // const local = globalTime - seg.start;
+					// setActiveSegmentIndex(segIndex);
+					// setSegmentLocalTime(local);
 
-          // setActiveSegmentIndex(segIndex);
-          // setSegmentLocalTime(local);
+					// videoRef.current.src = seg.src ?? ""; // hoặc seg.src
+					// videoRef.current.currentTime = local;
 
-          // videoRef.current.src = seg.src ?? ""; // hoặc seg.src
-          // videoRef.current.currentTime = local;
+					// if (isPlaying) {
+					//   videoRef.current.play();
+					// }
 
-          // if (isPlaying) {
-          //   videoRef.current.play();
-          // }
+					// if (isActive) {
+					//   setGlobalPlaybackState((prev) => ({
+					//     ...prev,
+					//     currentTime: globalTime,
+					//     activeSegment: segIndex,
+					//   }));
+					// }
+				},
 
-          // if (isActive) {
-          //   setGlobalPlaybackState((prev) => ({
-          //     ...prev,
-          //     currentTime: globalTime,
-          //     activeSegment: segIndex,
-          //   }));
-          // }
-        },
+				setSpeed(newSpeed: number) {
+					if (!videoRef.current) return;
+					videoRef.current.playbackRate = newSpeed;
+					setSpeed(newSpeed);
 
-        setSpeed(newSpeed: number) {
-          if (!videoRef.current) return;
-          videoRef.current.playbackRate = newSpeed;
-          setSpeed(newSpeed);
+					if (isActive) {
+						setGlobalPlaybackState((prev) => ({
+							...prev,
+							speed: newSpeed,
+						}));
+					}
+				},
+			}),
+			[
+				segements,
+				activeSegmentIndex,
+				segmentLocalTime,
+				isPlaying,
+				speed,
+				isActive,
+			],
+		);
 
-          if (isActive) {
-            setGlobalPlaybackState((prev) => ({
-              ...prev,
-              speed: newSpeed,
-            }));
-          }
-        },
-      }),
-      [
-        segements,
-        activeSegmentIndex,
-        segmentLocalTime,
-        isPlaying,
-        speed,
-        isActive,
-      ]
-    );
+		// Update video playback state
+		useEffect(() => {
+			if (videoRef.current && isActive) {
+				if (isPlaying) {
+					videoRef.current.play();
+				} else {
+					videoRef.current.pause();
+				}
+			}
+		}, [isPlaying, isActive]);
 
-    // Update video playback state
-    useEffect(() => {
-      if (videoRef.current && isActive) {
-        if (isPlaying) {
-          videoRef.current.play();
-        } else {
-          videoRef.current.pause();
-        }
-      }
-    }, [isPlaying, isActive]);
+		const handleClick = () => {
+			if (onSelect) {
+				onSelect(id);
+				setGlobalPlaybackState({
+					currentTime: segmentLocalTime,
+					speed,
+					activeSegment: activeSegmentIndex,
+					isPlaying,
+				});
+			}
+		};
 
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
+		useEffect(() => {
+			const video = videoRef.current;
+			if (!video) return;
 
-      let nextScale = scaleZoom + (e.deltaY > 0 ? -0.1 : 0.1);
-      nextScale = Math.min(Math.max(nextScale, 1), 5);
+			video.ontimeupdate = () => {
+				const localTime = video.currentTime;
+				const segment = segements[activeSegmentIndex];
+				if (!segment) return;
 
-      if (nextScale === 1) {
-        setOffset({ x: 0, y: 0 });
-      }
+				const globalTime = segment.start + localTime;
 
-      setScaleZoom(nextScale);
-    };
+				setSegmentLocalTime(localTime);
 
-    useEffect(() => {
-      const div = videoContentRef.current;
-      if (!div) return;
+				// gửi lên App nếu camera đang active
+				if (isActive) {
+					setGlobalPlaybackState((prev) => ({
+						...prev,
+						currentTime: globalTime,
+						speed,
+						activeSegment: activeSegmentIndex,
+					}));
+				}
+				// console.log("localTime", localTime);
+				// console.log("activeSegmentIndex", activeSegmentIndex);
+				// console.log("duration", video.duration);
 
-      div.addEventListener("wheel", handleWheel, { passive: false });
+				// nếu hết file video → chuyển sang segment tiếp theo
+				if (localTime >= video.duration - 0.5) {
+					changeSegment(1);
+				}
+			};
+		}, [segements, activeSegmentIndex, isActive]);
 
-      return () => div.removeEventListener("wheel", handleWheel);
-    }, [handleWheel]);
+		const urlPlayback = useMemo(() => {
+			if (segements.length === 0) return '';
+			// return segements[activeSegmentIndex]?.src;
+			return (
+				'http://192.168.17.43:8999/' + segements[activeSegmentIndex]?.src || ''
+			);
+		}, [segements, activeSegmentIndex]);
 
-    const handleMouseDown = (e: React.MouseEvent) => {
-      if (scaleZoom === 1) return;
-      setIsPanning(true);
-      lastPos.current = { x: e.clientX, y: e.clientY };
-    };
+		const changeSegment = (input: ChangeSegmentInput) => {
+			const video = videoRef.current;
+			if (!video) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isPanning || !videoContentRef.current) return;
+			let targetIndex: number;
 
-      const dx = e.clientX - lastPos.current.x;
-      const dy = e.clientY - lastPos.current.y;
+			if (typeof input === 'number') {
+				targetIndex = activeSegmentIndex + input;
+			} else {
+				targetIndex = input.index;
+			}
 
-      lastPos.current = { x: e.clientX, y: e.clientY };
+			// ❌ boundary check
+			if (targetIndex < 0) {
+				video.currentTime = 0;
+				return;
+			}
 
-      const container = videoContentRef.current.getBoundingClientRect();
-      const videoW = container.width * scaleZoom;
-      const videoH = container.height * scaleZoom;
+			if (targetIndex >= segements.length) {
+				video.pause();
+				return;
+			}
 
-      const maxX = (videoW - container.width) / 2;
-      const maxY = (videoH - container.height) / 2;
+			const targetSegment = segements[targetIndex];
 
-      setOffset((prev) => ({
-        x: clamp(prev.x + dx, -maxX, maxX),
-        y: clamp(prev.y + dy, -maxY, maxY),
-      }));
-    };
+			// 1️⃣ pause video hiện tại
+			video.pause();
 
-    const handleMouseUp = () => setIsPanning(false);
+			// 2️⃣ update local state
+			setActiveSegmentIndex(targetIndex);
+			setSegmentLocalTime(0);
 
-    const handleClick = () => {
-      if (onSelect) {
-        onSelect(id);
-        setGlobalPlaybackState({
-          currentTime: segmentLocalTime,
-          speed,
-          activeSegment: activeSegmentIndex,
-          isPlaying,
-        });
-      }
-    };
+			// 3️⃣ load video mới
+			video.src = targetSegment.src;
+			video.load();
 
-    useEffect(() => {
-      const video = videoRef.current;
-      if (!video) return;
+			// 4️⃣ đợi metadata rồi play
+			const onLoaded = () => {
+				video.currentTime = 0;
 
-      video.ontimeupdate = () => {
-        const localTime = video.currentTime;
-        const segment = segements[activeSegmentIndex];
-        if (!segment) return;
+				if (isPlaying) {
+					video
+						.play()
+						.catch((err) => console.warn('Play interrupted (safe):', err));
+				}
 
-        const globalTime = segment.start + localTime;
+				video.removeEventListener('loadedmetadata', onLoaded);
+			};
 
-        setSegmentLocalTime(localTime);
+			video.addEventListener('loadedmetadata', onLoaded);
 
-        // gửi lên App nếu camera đang active
-        if (isActive) {
-          setGlobalPlaybackState((prev) => ({
-            ...prev,
-            currentTime: globalTime,
-            speed,
-            activeSegment: activeSegmentIndex,
-          }));
-        }
-        // console.log("localTime", localTime);
-        // console.log("activeSegmentIndex", activeSegmentIndex);
-        // console.log("duration", video.duration);
+			// 5️⃣ update global state
+			if (isActive) {
+				setGlobalPlaybackState((prev) => ({
+					...prev,
+					currentTime: targetSegment.start,
+					activeSegment: targetIndex,
+					isPlaying,
+				}));
+			}
+		};
 
-        // nếu hết file video → chuyển sang segment tiếp theo
-        if (localTime >= video.duration - 0.5) {
-          changeSegment(1);
-        }
-      };
-    }, [segements, activeSegmentIndex, isActive]);
+		return (
+			<div
+				className={`flex flex-col h-full bg-slate-900 rounded-lg overflow-hidden relative transition-all duration-300 ${
+					isActive
+						? 'ring-4 ring-blue-500 ring-offset-2 ring-offset-slate-900 shadow-2xl shadow-blue-500/50 scale-[1.02] z-10'
+						: 'shadow-xl'
+				}`}
+				ref={containerRef}
+			>
+				{/* Camera Header */}
+				<div
+					className={`camera-header z-10 flex items-center justify-between px-3 py-2 border-b transition-colors ${
+						isActive
+							? 'bg-blue-700/40 border-blue-400 shadow-inner'
+							: 'bg-slate-700 border-slate-600'
+					}`}
+				>
+					<div className="flex items-center gap-2">
+						<div
+							className={`w-2.5 h-2.5 rounded-full transition-all ${
+								isActive
+									? 'bg-blue-300 animate-pulse shadow-md shadow-blue-300/70'
+									: 'bg-blue-400'
+							}`}
+						/>
+						<span
+							className={`text-sm font-medium transition-colors ${
+								isActive ? 'text-blue-100 font-semibold' : 'text-slate-100'
+							}`}
+						>
+							{name}
+						</span>
+					</div>
+					<div className="flex items-center gap-1">
+						<button
+							className="p-1 hover:bg-slate-700 rounded transition-colors"
+							onClick={() => onRemove(id)}
+							title="Remove Camera"
+						>
+							<X className="w-4 h-4 text-slate-300" />
+						</button>
+					</div>
+				</div>
 
-    const urlPlayback = useMemo(() => {
-      if (segements.length === 0) return "";
-      // return segements[activeSegmentIndex]?.src;
-      return (
-        "http://192.168.17.43:8999/" + segements[activeSegmentIndex]?.src || ""
-      );
-    }, [segements, activeSegmentIndex]);
+				{/* Camera Content */}
+				<div
+					className="camera-content flex-1 relative bg-slate-800"
+					ref={videoContentRef}
+					onMouseEnter={() => setShowZoomControls(true)}
+					onMouseLeave={() => setShowZoomControls(false)}
+				>
+					<TransformWrapper
+						initialScale={1}
+						minScale={1}
+						maxScale={5}
+						limitToBounds={true}
+						centerOnInit={true}
+						wheel={{
+							step: 0.1,
+							wheelDisabled: false,
+							touchPadDisabled: false,
+							activationKeys: [],
+						}}
+						doubleClick={{
+							disabled: false,
+							mode: 'zoomIn',
+						}}
+						panning={{
+							disabled: false,
+							velocityDisabled: false,
+						}}
+					>
+						{({ zoomIn, zoomOut, resetTransform }) => (
+							<>
+								<TransformComponent
+									wrapperClass="w-full h-full"
+									contentClass="w-full h-full flex items-center justify-center"
+								>
+									<div
+										className="relative w-full h-full flex items-center justify-center cursor-pointer"
+										onClick={handleClick}
+									>
+										<div className="absolute inset-0">
+											<img
+												src={generatePattern()}
+												alt={`Camera ${name}`}
+												className="w-full h-full object-cover"
+											/>
+										</div>
+										<video
+											ref={videoRef}
+											autoPlay={false}
+											src={urlPlayback}
+											playsInline
+											muted
+											controls={false}
+											style={{
+												width: '100%',
+												height: '100%',
+												objectFit: 'contain',
+												zIndex: 2,
+											}}
+										/>
+									</div>
+								</TransformComponent>
 
-    const changeSegment = (input: ChangeSegmentInput) => {
-      const video = videoRef.current;
-      if (!video) return;
+								{/* Zoom Controls */}
+								{showZoomControls && (
+									<div className="absolute top-2 right-2 z-20 flex gap-2">
+										<button
+											onClick={(e) => {
+												e.stopPropagation();
+												zoomIn();
+											}}
+											className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg shadow-lg transition-colors backdrop-blur-sm"
+											title="Phóng to"
+										>
+											<ZoomIn className="w-4 h-4" />
+										</button>
+										<button
+											onClick={(e) => {
+												e.stopPropagation();
+												zoomOut();
+											}}
+											className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg shadow-lg transition-colors backdrop-blur-sm"
+											title="Thu nhỏ"
+										>
+											<ZoomOut className="w-4 h-4" />
+										</button>
+										<button
+											onClick={(e) => {
+												e.stopPropagation();
+												resetTransform();
+											}}
+											className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg shadow-lg transition-colors backdrop-blur-sm"
+											title="Đặt lại"
+										>
+											<RotateCcw className="w-4 h-4" />
+										</button>
+									</div>
+								)}
 
-      let targetIndex: number;
-
-      if (typeof input === "number") {
-        targetIndex = activeSegmentIndex + input;
-      } else {
-        targetIndex = input.index;
-      }
-
-      // ❌ boundary check
-      if (targetIndex < 0) {
-        video.currentTime = 0;
-        return;
-      }
-
-      if (targetIndex >= segements.length) {
-        video.pause();
-        return;
-      }
-
-      const targetSegment = segements[targetIndex];
-
-      // 1️⃣ pause video hiện tại
-      video.pause();
-
-      // 2️⃣ update local state
-      setActiveSegmentIndex(targetIndex);
-      setSegmentLocalTime(0);
-
-      // 3️⃣ load video mới
-      video.src = targetSegment.src;
-      video.load();
-
-      // 4️⃣ đợi metadata rồi play
-      const onLoaded = () => {
-        video.currentTime = 0;
-
-        if (isPlaying) {
-          video
-            .play()
-            .catch((err) => console.warn("Play interrupted (safe):", err));
-        }
-
-        video.removeEventListener("loadedmetadata", onLoaded);
-      };
-
-      video.addEventListener("loadedmetadata", onLoaded);
-
-      // 5️⃣ update global state
-      if (isActive) {
-        setGlobalPlaybackState((prev) => ({
-          ...prev,
-          currentTime: targetSegment.start,
-          activeSegment: targetIndex,
-          isPlaying,
-        }));
-      }
-    };
-
-    return (
-      <div
-        className={`flex flex-col h-full bg-slate-900 rounded-lg overflow-hidden relative transition-all duration-300 ${
-          isActive
-            ? "ring-4 ring-blue-500 ring-offset-2 ring-offset-slate-900 shadow-2xl shadow-blue-500/50 scale-[1.02] z-10"
-            : "shadow-xl"
-        }`}
-        ref={containerRef}
-      >
-        {/* Camera Header */}
-        <div
-          className={`camera-header z-10 flex items-center justify-between px-3 py-2 border-b transition-colors ${
-            isActive
-              ? "bg-blue-700/40 border-blue-400 shadow-inner"
-              : "bg-slate-700 border-slate-600"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-2.5 h-2.5 rounded-full transition-all ${
-                isActive
-                  ? "bg-blue-300 animate-pulse shadow-md shadow-blue-300/70"
-                  : "bg-blue-400"
-              }`}
-            />
-            <span
-              className={`text-sm font-medium transition-colors ${
-                isActive ? "text-blue-100 font-semibold" : "text-slate-100"
-              }`}
-            >
-              {name}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              className="p-1 hover:bg-slate-700 rounded transition-colors"
-              onClick={() => onRemove(id)}
-              title="Remove Camera"
-            >
-              <X className="w-4 h-4 text-slate-300" />
-            </button>
-          </div>
-        </div>
-
-        {/* Camera Content */}
-        <div
-          className="camera-content flex-1 relative bg-slate-800 cursor-pointer"
-          ref={videoContentRef}
-          onClick={handleClick}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onMouseMove={(e) => handleMouseMove(e.nativeEvent)}
-        >
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            style={{
-              transform: `
-      scale(${scaleZoom})
-      translate(${offset.x / scaleZoom}px, ${offset.y / scaleZoom}px)
-    `,
-              transformOrigin: "center center",
-              transition: isPanning ? "none" : "transform 0.15s ease-out",
-              cursor: scaleZoom > 1 ? "grab" : "default",
-            }}
-          >
-            <div className="absolute inset-0">
-              <img
-                src={generatePattern()}
-                alt={`Camera ${name}`}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <video
-              ref={videoRef}
-              autoPlay={false}
-              src={urlPlayback}
-              playsInline
-              muted
-              controls={false}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "fill",
-                zIndex: 2,
-              }}
-            />
-          </div>
-
-          {/* Active indicator */}
-          {isActive && (
-            <div className="absolute top-2 left-2 bg-blue-600 px-2 py-1 rounded text-xs text-white font-semibold shadow-lg z-20">
-              Đang chọn
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+								{/* Active indicator */}
+								{isActive && (
+									<div className="absolute top-2 left-2 bg-blue-600 px-2 py-1 rounded text-xs text-white font-semibold shadow-lg z-20 pointer-events-none">
+										Đang chọn
+									</div>
+								)}
+							</>
+						)}
+					</TransformWrapper>
+				</div>
+			</div>
+		);
+	},
 );
