@@ -14,10 +14,9 @@ export const createStream = async (
   isRecording: boolean | null
 ) => {
   try {
-    console.log("aaaa", `http://${MTX_HOST}:${MTX_PORT}/api/streams`);
     const response = await axios.post(
-      `http://${MTX_HOST}:${MTX_PORT}/api/streams`,
-      // `/api/streams`,
+      // `http://${MTX_HOST}:${MTX_PORT}/api/streams`,
+      `/api/streams`,
       {
         inputUrl,
         onDemand: true,

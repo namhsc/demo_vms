@@ -366,10 +366,10 @@ export function LiveviewFeed({
         await pc.setLocalDescription(offer);
 
         const authHeader = "Basic " + btoa(`${VIEWER_USER}:${VIEWER_PASS}`);
-        const urlgetWhep = `http://${MTX_HOST}:${MTX_PORT}${currentUrl}`;
+        // const urlgetWhep = `http://${MTX_HOST}:${MTX_PORT}${currentUrl}`;
 
-        const response = await fetch(urlgetWhep, {
-          // const response = await fetch(currentUrl, {
+        // const response = await fetch(urlgetWhep, {
+        const response = await fetch(currentUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/sdp",
