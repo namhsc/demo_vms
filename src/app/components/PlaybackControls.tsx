@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import {
   Play,
   Pause,
@@ -17,8 +17,8 @@ interface PlaybackControlsProps {
   selectedDate: Date;
   selectedTime: string;
   onPlayPause: () => void;
-  onSeek: (time: number) => void;
-  onSkip: (seconds: number) => void;
+  onSeek: () => void;
+  onSkip: () => void;
   onSpeedChange: (speed: number) => void;
   onDateChange: (date: Date) => void;
   onTimeChange: (time: string) => void;
@@ -93,34 +93,34 @@ export function PlaybackControls({
     // updateZoom(newZoom);
   };
 
-  const updateZoom = (newZoom: number) => {
-    // Calculate new view range centered on current time
-    // const center = currentTime;
-    // const newVisibleDuration = duration / newZoom;
-    // const halfDuration = newVisibleDuration / 2;
-    // let newStart = Math.max(0, center - halfDuration);
-    // let newEnd = Math.min(duration, center + halfDuration);
-    // // Adjust if we hit boundaries
-    // if (newEnd >= duration) {
-    //   newEnd = duration;
-    //   newStart = Math.max(0, duration - newVisibleDuration);
-    // }
-    // if (newStart <= 0) {
-    //   newStart = 0;
-    //   newEnd = Math.min(duration, newVisibleDuration);
-    // }
-    // if (onZoomChange) {
-    //   onZoomChange(newZoom);
-    // } else {
-    //   setInternalZoomLevel(newZoom);
-    // }
-    // if (onViewChange) {
-    //   onViewChange(newStart, newEnd);
-    // } else {
-    //   setInternalViewStart(newStart);
-    //   setInternalViewEnd(newEnd);
-    // }
-  };
+  // const updateZoom = (newZoom: number) => {
+  // Calculate new view range centered on current time
+  // const center = currentTime;
+  // const newVisibleDuration = duration / newZoom;
+  // const halfDuration = newVisibleDuration / 2;
+  // let newStart = Math.max(0, center - halfDuration);
+  // let newEnd = Math.min(duration, center + halfDuration);
+  // // Adjust if we hit boundaries
+  // if (newEnd >= duration) {
+  //   newEnd = duration;
+  //   newStart = Math.max(0, duration - newVisibleDuration);
+  // }
+  // if (newStart <= 0) {
+  //   newStart = 0;
+  //   newEnd = Math.min(duration, newVisibleDuration);
+  // }
+  // if (onZoomChange) {
+  //   onZoomChange(newZoom);
+  // } else {
+  //   setInternalZoomLevel(newZoom);
+  // }
+  // if (onViewChange) {
+  //   onViewChange(newStart, newEnd);
+  // } else {
+  //   setInternalViewStart(newStart);
+  //   setInternalViewEnd(newEnd);
+  // }
+  // };
 
   // Update view when currentTime changes to keep it in view (only if seeking)
   // useEffect(() => {
@@ -184,7 +184,7 @@ export function PlaybackControls({
           {/* Center - Playback Controls */}
           <div className="flex items-center gap-2 flex-1 justify-center">
             <button
-              onClick={() => onSkip(-10)}
+              onClick={() => onSeek()}
               className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
               title="Rewind 10s"
             >
@@ -202,7 +202,7 @@ export function PlaybackControls({
               )}
             </button>
             <button
-              onClick={() => onSkip(10)}
+              onClick={() => onSkip()}
               className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
               title="Forward 10s"
             >

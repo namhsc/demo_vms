@@ -7,7 +7,6 @@ import React, {
   useMemo,
 } from "react";
 import { X } from "lucide-react";
-// import demoVideo from "../../assets/video.mp4";
 import { generatePattern } from "./CameraFeed";
 import { VideoSegment } from "../App";
 
@@ -28,11 +27,19 @@ interface PlaybackFeedProps {
   segements: VideoSegment[];
 }
 
+type ChangeSegmentInput =
+  | number
+  | {
+      index: number;
+    };
+
 export interface PlaybackFeedHandle {
   play: () => void;
   pause: () => void;
   seekToGlobalTime: (globalTime: number) => void;
   setSpeed: (speed: number) => void;
+  nextSegment: () => void;
+  prevSegment: () => void;
 }
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -99,34 +106,43 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
           }
         },
 
+        prevSegment() {
+          if (isActive) changeSegment(-1);
+        },
+
+        nextSegment() {
+          if (isActive) changeSegment(1);
+        },
+
         seekToGlobalTime(globalTime: number) {
           if (!videoRef.current || segements.length === 0) return;
+          console.log("globalTime", globalTime);
+          return;
+          // const segIndex = segements.findIndex(
+          //   (s) => globalTime >= s.start && globalTime < s.end
+          // );
+          // if (segIndex === -1) return;
 
-          const segIndex = segements.findIndex(
-            (s) => globalTime >= s.start && globalTime < s.end
-          );
-          if (segIndex === -1) return;
+          // const seg = segements[segIndex];
+          // const local = globalTime - seg.start;
 
-          const seg = segements[segIndex];
-          const local = globalTime - seg.start;
+          // setActiveSegmentIndex(segIndex);
+          // setSegmentLocalTime(local);
 
-          setActiveSegmentIndex(segIndex);
-          setSegmentLocalTime(local);
+          // videoRef.current.src = seg.src ?? ""; // hoặc seg.src
+          // videoRef.current.currentTime = local;
 
-          videoRef.current.src = seg.src ?? ""; // hoặc seg.src
-          videoRef.current.currentTime = local;
+          // if (isPlaying) {
+          //   videoRef.current.play();
+          // }
 
-          if (isPlaying) {
-            videoRef.current.play();
-          }
-
-          if (isActive) {
-            setGlobalPlaybackState((prev) => ({
-              ...prev,
-              currentTime: globalTime,
-              activeSegment: segIndex,
-            }));
-          }
+          // if (isActive) {
+          //   setGlobalPlaybackState((prev) => ({
+          //     ...prev,
+          //     currentTime: globalTime,
+          //     activeSegment: segIndex,
+          //   }));
+          // }
         },
 
         setSpeed(newSpeed: number) {
@@ -233,10 +249,7 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
       video.ontimeupdate = () => {
         const localTime = video.currentTime;
         const segment = segements[activeSegmentIndex];
-        console.log("activeSegmentIndex", activeSegmentIndex);
         if (!segment) return;
-        console.log("segment", segment);
-        console.log("localTime", localTime);
 
         const globalTime = segment.start + localTime;
 
@@ -251,49 +264,84 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
             activeSegment: activeSegmentIndex,
           }));
         }
-        console.log("duration", video.duration);
+        // console.log("localTime", localTime);
+        // console.log("activeSegmentIndex", activeSegmentIndex);
+        // console.log("duration", video.duration);
 
         // nếu hết file video → chuyển sang segment tiếp theo
         if (localTime >= video.duration - 0.5) {
-          goToNextSegment();
+          changeSegment(1);
         }
       };
     }, [segements, activeSegmentIndex, isActive]);
 
     const urlPlayback = useMemo(() => {
       if (segements.length === 0) return "";
+      // return segements[activeSegmentIndex]?.src;
       return (
         "http://192.168.17.43:8999/" + segements[activeSegmentIndex]?.src || ""
       );
     }, [segements, activeSegmentIndex]);
 
-    const goToNextSegment = () => {
-      const next = activeSegmentIndex + 1;
-      console.log("Chuyển sang segment tiếp theo:", next);
-      if (next >= segements.length) {
-        console.log("Hết tất cả segment → dừng video");
-        videoRef.current?.pause();
+    const changeSegment = (input: ChangeSegmentInput) => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      let targetIndex: number;
+
+      if (typeof input === "number") {
+        targetIndex = activeSegmentIndex + input;
+      } else {
+        targetIndex = input.index;
+      }
+
+      // ❌ boundary check
+      if (targetIndex < 0) {
+        video.currentTime = 0;
         return;
       }
 
-      setActiveSegmentIndex(next);
-      setSegmentLocalTime(0);
-
-      // load lại video
-      if (videoRef.current) {
-        videoRef.current.src = segements[next].src;
-        videoRef.current.currentTime = 0;
-        videoRef.current.play();
+      if (targetIndex >= segements.length) {
+        video.pause();
+        return;
       }
 
-      // update global
+      const targetSegment = segements[targetIndex];
+
+      // 1️⃣ pause video hiện tại
+      video.pause();
+
+      // 2️⃣ update local state
+      setActiveSegmentIndex(targetIndex);
+      setSegmentLocalTime(0);
+
+      // 3️⃣ load video mới
+      video.src = targetSegment.src;
+      video.load();
+
+      // 4️⃣ đợi metadata rồi play
+      const onLoaded = () => {
+        video.currentTime = 0;
+
+        if (isPlaying) {
+          video
+            .play()
+            .catch((err) => console.warn("Play interrupted (safe):", err));
+        }
+
+        video.removeEventListener("loadedmetadata", onLoaded);
+      };
+
+      video.addEventListener("loadedmetadata", onLoaded);
+
+      // 5️⃣ update global state
       if (isActive) {
-        setGlobalPlaybackState({
-          currentTime: segements[next].start,
-          speed,
-          activeSegment: next,
+        setGlobalPlaybackState((prev) => ({
+          ...prev,
+          currentTime: targetSegment.start,
+          activeSegment: targetIndex,
           isPlaying,
-        });
+        }));
       }
     };
 

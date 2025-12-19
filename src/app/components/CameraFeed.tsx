@@ -13,6 +13,8 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import {
   createStream,
+  MTX_HOST,
+  MTX_PORT,
   VIEWER_PASS,
   VIEWER_USER,
 } from "../../services/streamService";
@@ -262,8 +264,9 @@ export function LiveviewFeed({
         await pc.setLocalDescription(offer);
 
         const authHeader = "Basic " + btoa(`${VIEWER_USER}:${VIEWER_PASS}`);
+        const urlgetWhep = `http://${MTX_HOST}:${MTX_PORT}${currentUrl}`;
 
-        const response = await fetch(currentUrl, {
+        const response = await fetch(urlgetWhep, {
           method: "POST",
           headers: {
             "Content-Type": "application/sdp",
@@ -280,7 +283,7 @@ export function LiveviewFeed({
         const answerSDP = await response.text();
         await pc.setRemoteDescription({ type: "answer", sdp: answerSDP });
 
-        console.log("WebRTC connected:", currentUrl);
+        console.log("WebRTC connected:");
       } catch (err) {
         console.error("WebRTC error:", err);
         throw err;

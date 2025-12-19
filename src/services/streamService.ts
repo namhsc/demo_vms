@@ -3,7 +3,7 @@ import { VideoSegment } from "../app/App";
 
 export const MTX_HOST = "192.168.17.43"; // IP MediaMTX
 export const PORT = 8080; // webrtcAddress
-export const MTX_PORT = 8889; // webrtcAddress
+export const MTX_PORT = 8999; // webrtcAddress
 
 export const PATH_NAME = "p_se3qwd5idgv1t"; // path đã tạo
 export const VIEWER_USER = "viewer"; // user read
@@ -12,8 +12,8 @@ export const VIEWER_PASS = "viewer123"; // pass read
 export const createStream = async (inputUrl: string) => {
   try {
     const response = await axios.post(
-      // `http://${MTX_HOST}:${PORT}/api/streams`,
-      `/api/streams`,
+      `http://${MTX_HOST}:${MTX_PORT}/api/streams`,
+      // `/api/streams`,
       {
         inputUrl,
         onDemand: true,
@@ -63,7 +63,6 @@ export const createSegmentsFromRecordList = (
   records: RecordVideoApi[]
 ): VideoSegment[] => {
   const segments: VideoSegment[] = [];
-  console.log("records", records);
   records.forEach((record, index) => {
     /** 1. Parse start time từ fileName */
     const { hh, mm, ss } = parseTimeFromFileName(record.fileName);
@@ -91,11 +90,6 @@ export const createSegmentsFromRecordList = (
       createdAt: record.createdAt,
     });
   });
-
-  console.log(
-    "sadsd",
-    segments.sort((a, b) => a.start - b.start)
-  );
 
   return segments.sort((a, b) => a.start - b.start);
 };

@@ -38,12 +38,12 @@ const SEGMENT_GAP_SECONDS = 30 * 60; // 30 phút
 
 const createSegmentsForCamera = (
   durationSeconds: number,
-  startOffsetSeconds: number
+  startOffsetSeconds?: number
 ): VideoSegment[] => {
   const segments: VideoSegment[] = [];
 
   let index = 0;
-  let start = startOffsetSeconds;
+  let start = startOffsetSeconds || 0;
 
   while (start < DAY_SECONDS) {
     const end = start + durationSeconds;
@@ -54,7 +54,7 @@ const createSegmentsForCamera = (
       index,
       start,
       end,
-      src: "11",
+      src: "demoVideo",
     });
 
     start = end + SEGMENT_GAP_SECONDS;
@@ -160,18 +160,8 @@ function App() {
     setActivePlaybackCamera(id);
   };
 
-  const handleSeek = (time: number) => {
-    // setCurrentTime(time);
-  };
-
-  const handleSkip = (seconds: number) => {
-    // const newTime = Math.min(Math.max(currentTime + seconds, 0), duration);
-    // setCurrentTime(newTime);
-  };
-
   // const videoRef = useRef<HTMLVideoElement>(null);
 
-  // const [duration, setDuration] = useState(0);
   const [segments, setSegments] = useState<VideoSegment[]>([]);
   const [globalPlaybackState, setGlobalPlaybackState] = useState({
     currentTime: 0,
@@ -185,6 +175,31 @@ function App() {
   >({});
 
   useEffect(() => {
+    // const video = videoRef.current;
+    // if (!video) return;
+    // video.onloadedmetadata = () => {
+    //   const durationSeconds = video.duration;
+    //   const camerasNeedLoad = cameras.filter(
+    //     (cam) => !segmentsByCameraId[cam.i]
+    //   );
+
+    //   if (camerasNeedLoad.length === 0) return;
+    //   const abc = camerasNeedLoad.map((cam) => {
+    //     return {
+    //       cameraId: cam.i,
+    //       segments: createSegmentsForCamera(durationSeconds),
+    //     };
+    //   });
+    //   setSegmentsByCameraId((prev) => {
+    //     const next = { ...prev };
+    //     abc.forEach((r) => {
+    //       next[r.cameraId] = r.segments;
+    //     });
+    //     return next;
+    //   });
+    // };
+
+    // return;
     const loadSegments = async () => {
       const camerasNeedLoad = cameras.filter(
         (cam) => !segmentsByCameraId[cam.i]
@@ -214,39 +229,6 @@ function App() {
     loadSegments();
   }, [cameras]); // ✅ CHỈ phụ thuộc cameras
 
-  useEffect(() => {
-    // getListStream("cam_record_02").then((data) => {
-    //   console.log("Data video list:", data);
-    //   const lístSegments = createSegmentsFromRecordList(data.videos);
-    //   console.log("lístSegments", lístSegments);
-    // });
-    // const video = videoRef.current;
-    // if (!video) return;
-    // video.src = demoVideo;
-    // video.onloadedmetadata = () => {
-    // const durationSeconds = video.duration;
-    // setCameras((prev) => {
-    //   return prev.map((item, index) => {
-    //     // if (item.i === "cam-2") {
-    //       getListStream("cam_record_02").then((data) => {
-    //         console.log("Data video list:", data);
-    //         const lístSegments = createSegmentsFromRecordList(data.videos);
-    //         console.log("lístSegments", lístSegments);
-    //       });
-    //     // }
-    //     return {
-    //       ...item,
-    //       segments: createSegmentsForCamera(
-    //         durationSeconds,
-    //         index * CAMERA_OFFSET_SECONDS // lệch 10 phút mỗi camera
-    //       ),
-    //     };
-    //   });
-    // });
-    // setDuration(durationSeconds);
-    // };
-  }, []);
-
   // Simulate playback time (in real app, this would come from video element)
   useEffect(() => {
     if (viewMode !== "playback") return;
@@ -267,6 +249,20 @@ function App() {
     } else {
       ref.play();
     }
+  };
+
+  const handleSeek = () => {
+    if (!activePlaybackCamera) return;
+    const ref = cameraRefs.current[activePlaybackCamera];
+    if (!ref) return;
+    ref.prevSegment();
+  };
+
+  const handleSkip = () => {
+    if (!activePlaybackCamera) return;
+    const ref = cameraRefs.current[activePlaybackCamera];
+    if (!ref) return;
+    ref.nextSegment();
   };
 
   useEffect(() => {
@@ -409,7 +405,6 @@ function App() {
                     segments={segments}
                     isPlaying={globalPlaybackState.isPlaying}
                     currentTime={currentTime}
-                    // duration={duration}
                     playbackSpeed={playbackSpeed}
                     selectedDate={selectedDate}
                     selectedTime={selectedTime}
