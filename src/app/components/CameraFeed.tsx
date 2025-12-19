@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Settings, X, Play, Pause, Maximize, Save } from "lucide-react";
+import {
+  Settings,
+  X,
+  Play,
+  Pause,
+  Maximize,
+  Save,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+} from "lucide-react";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   Dialog,
   DialogContent,
@@ -72,9 +83,6 @@ export const generatePattern = () => {
   return "";
 };
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
-
 export function LiveviewFeed({
   id,
   name,
@@ -94,7 +102,6 @@ export function LiveviewFeed({
   const [rtspUrlInput, setRtspUrlInput] = useState(initialUrl || "");
   const [currentUrl, setCurrentUrl] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastPos = useRef({ x: 0, y: 0 });
   const videoContentRef = useRef<HTMLDivElement>(null);
   const [scaleZoom, setScaleZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -109,6 +116,20 @@ export function LiveviewFeed({
 
     return () => clearInterval(interval);
   }, []);
+
+  // Handle video pause/play
+  useEffect(() => {
+    const video = videoRef.current as HTMLVideoElement | null;
+    if (!video) return;
+
+    if (isPaused) {
+      video.pause();
+    } else if (isLive) {
+      video.play().catch((err) => {
+        console.warn("Play failed:", err);
+      });
+    }
+  }, [isPaused, isLive]);
 
   // Listen for fullscreen changes
   useEffect(() => {
@@ -323,58 +344,6 @@ export function LiveviewFeed({
     };
   }, [currentUrl]);
 
-  const handleWheel = (e: WheelEvent) => {
-    e.preventDefault();
-
-    let nextScale = scaleZoom + (e.deltaY > 0 ? -0.1 : 0.1);
-    nextScale = Math.min(Math.max(nextScale, 1), 5); // min 1 - max 5
-
-    if (nextScale === 1) {
-      // Reset pan khi về mức zoom 1
-      setOffset({ x: 0, y: 0 });
-    }
-
-    setScaleZoom(nextScale);
-  };
-
-  useEffect(() => {
-    const div = videoContentRef.current;
-    if (!div) return;
-
-    div.addEventListener("wheel", handleWheel, { passive: false });
-
-    return () => div.removeEventListener("wheel", handleWheel);
-  }, [handleWheel]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (scaleZoom === 1) return; // không pan khi chưa zoom
-    setIsPanning(true);
-    lastPos.current = { x: e.clientX, y: e.clientY };
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isPanning || !videoContentRef.current) return;
-
-    const dx = e.clientX - lastPos.current.x;
-    const dy = e.clientY - lastPos.current.y;
-
-    lastPos.current = { x: e.clientX, y: e.clientY };
-
-    const container = videoContentRef.current.getBoundingClientRect();
-    const videoW = container.width * scaleZoom;
-    const videoH = container.height * scaleZoom;
-
-    const maxX = (videoW - container.width) / 2;
-    const maxY = (videoH - container.height) / 2;
-
-    setOffset((prev) => ({
-      x: clamp(prev.x + dx, -maxX, maxX),
-      y: clamp(prev.y + dy, -maxY, maxY),
-    }));
-  };
-
-  const handleMouseUp = () => setIsPanning(false);
-
   return (
     <div
       className="flex flex-col h-full bg-slate-900 rounded-lg overflow-hidden shadow-xl relative"
@@ -427,107 +396,155 @@ export function LiveviewFeed({
       <div
         className="camera-content flex-1 relative bg-slate-800"
         ref={videoContentRef}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onMouseMove={(e) => handleMouseMove(e.nativeEvent)}
       >
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{
-            transform: `
-      scale(${scaleZoom})
-      translate(${offset.x / scaleZoom}px, ${offset.y / scaleZoom}px)
-    `,
-            transformOrigin: "center center",
-            transition: isPanning ? "none" : "transform 0.15s ease-out",
-            cursor: scaleZoom > 1 ? "grab" : "default",
+        <TransformWrapper
+          initialScale={1}
+          minScale={1}
+          maxScale={5}
+          limitToBounds={true}
+          centerOnInit={true}
+          wheel={{
+            step: 0.1,
+            wheelDisabled: false,
+            touchPadDisabled: false,
+            activationKeys: [],
+          }}
+          doubleClick={{
+            disabled: false,
+            mode: "zoomIn",
+          }}
+          panning={{
+            disabled: false,
+            velocityDisabled: false,
           }}
         >
-          <div className="absolute inset-0">
-            <img
-              src={generatePattern()}
-              alt={`Camera ${name}`}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          {/* <div className="absolute inset-0"> */}
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            controls={false}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "fill",
-              zIndex: 2,
-            }}
-          />
-          {/* </div> */}
-        </div>
-
-        <div className="absolute inset-0 flex items-center justify-center">
-          {isLive ? (
-            <div className="w-full h-full relative">
-              {/* Top Overlay Info */}
-              <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-xs text-white">
-                {isPaused ? "PAUSED" : "LIVE"}
-              </div>
-
-              {/* Bottom Info - Above Controls */}
-              <div
-                className={`absolute left-2 right-2 flex justify-between text-xs text-white font-mono transition-all ${
-                  showControls ? "bottom-14" : "bottom-2"
-                }`}
+          {({ zoomIn, zoomOut, resetTransform }) => (
+            <>
+              <TransformComponent
+                wrapperClass="w-full h-full"
+                contentClass="w-full h-full flex items-center justify-center"
               >
-                <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded">
-                  {timestamp.toLocaleTimeString()}
-                </div>
-              </div>
-
-              {/* Control Bar - Bottom Fixed */}
-              <div
-                className={`absolute bottom-0 left-0 right-0 transition-all duration-300 ${
-                  showControls
-                    ? "opacity-100 translate-y-0"
-                    : "opacity-0 translate-y-4"
-                }`}
-              >
-                <div className="bg-black/80 backdrop-blur-md px-4 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    {/* Left Controls - Play/Pause */}
-                    <button
-                      onClick={() => setIsPaused(!isPaused)}
-                      className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
-                      title={isPaused ? "Play" : "Pause"}
-                    >
-                      {isPaused ? (
-                        <Play className="w-4 h-4 text-white" fill="white" />
-                      ) : (
-                        <Pause className="w-4 h-4 text-white" fill="white" />
-                      )}
-                    </button>
-
-                    {/* Right Controls - Fullscreen */}
-                    <button
-                      onClick={toggleFullscreen}
-                      className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
-                      title="Fullscreen"
-                    >
-                      <Maximize className="w-4 h-4 text-white" />
-                    </button>
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <div className="absolute inset-0">
+                    <img
+                      src={generatePattern()}
+                      alt={`Camera ${name}`}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    controls={false}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      zIndex: 2,
+                    }}
+                  />
                 </div>
+              </TransformComponent>
+
+              {/* Zoom Controls */}
+              {showControls && (
+                <div className="absolute top-2 right-2 z-20 flex gap-2">
+                  <button
+                    onClick={() => zoomIn()}
+                    className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg shadow-lg transition-colors backdrop-blur-sm"
+                    title="Phóng to"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => zoomOut()}
+                    className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg shadow-lg transition-colors backdrop-blur-sm"
+                    title="Thu nhỏ"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => resetTransform()}
+                    className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg shadow-lg transition-colors backdrop-blur-sm"
+                    title="Đặt lại"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Overlay Info */}
+              <div className="absolute inset-0 pointer-events-none">
+                {isLive ? (
+                  <div className="w-full h-full relative">
+                    {/* Top Overlay Info */}
+                    <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-xs text-white pointer-events-auto">
+                      {isPaused ? "PAUSED" : "LIVE"}
+                    </div>
+
+                    {/* Bottom Info - Above Controls */}
+                    <div
+                      className={`absolute left-2 right-2 flex justify-between text-xs text-white font-mono transition-all ${
+                        showControls ? "bottom-14" : "bottom-2"
+                      }`}
+                    >
+                      <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded">
+                        {timestamp.toLocaleTimeString()}
+                      </div>
+                    </div>
+
+                    {/* Control Bar - Bottom Fixed */}
+                    <div
+                      className={`absolute bottom-0 left-0 right-0 transition-all duration-300 pointer-events-auto ${
+                        showControls
+                          ? "opacity-100 translate-y-0"
+                          : "opacity-0 translate-y-4"
+                      }`}
+                    >
+                      <div className="bg-black/80 backdrop-blur-md px-4 py-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          {/* Left Controls - Play/Pause */}
+                          <button
+                            onClick={() => setIsPaused(!isPaused)}
+                            className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
+                            title={isPaused ? "Play" : "Pause"}
+                          >
+                            {isPaused ? (
+                              <Play
+                                className="w-4 h-4 text-white"
+                                fill="white"
+                              />
+                            ) : (
+                              <Pause
+                                className="w-4 h-4 text-white"
+                                fill="white"
+                              />
+                            )}
+                          </button>
+
+                          {/* Right Controls - Fullscreen */}
+                          <button
+                            onClick={toggleFullscreen}
+                            className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
+                            title="Fullscreen"
+                          >
+                            <Maximize className="w-4 h-4 text-white" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500">
+                    <span className="text-sm">Không có tín hiệu</span>
+                  </div>
+                )}
               </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-slate-500">
-              <span className="text-sm">Không có tín hiệu</span>
-            </div>
+            </>
           )}
-        </div>
+        </TransformWrapper>
       </div>
 
       {/* Settings Dialog */}

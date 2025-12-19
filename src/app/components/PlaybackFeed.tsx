@@ -6,7 +6,8 @@ import React, {
   useImperativeHandle,
   useMemo,
 } from "react";
-import { X } from "lucide-react";
+import { X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { generatePattern } from "./CameraFeed";
 import { VideoSegment } from "../App";
 
@@ -41,8 +42,6 @@ export interface PlaybackFeedHandle {
   nextSegment: () => void;
   prevSegment: () => void;
 }
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
 
 export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
   (
@@ -59,12 +58,8 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
   ) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const lastPos = useRef({ x: 0, y: 0 });
     const videoContentRef = useRef<HTMLDivElement>(null);
-
-    const [scaleZoom, setScaleZoom] = useState(1);
-    const [offset, setOffset] = useState({ x: 0, y: 0 });
-    const [isPanning, setIsPanning] = useState(false);
+    const [showZoomControls, setShowZoomControls] = useState(false);
 
     const [speed, setSpeed] = useState(1);
     const [activeSegmentIndex, setActiveSegmentIndex] = useState(0);
@@ -106,7 +101,6 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
           if (!videoRef.current) return;
           videoRef.current.play();
           setIsPlaying(true);
-
           if (isActive) {
             const seg = segements[activeSegmentIndex];
             const globalTime = seg.start + segmentLocalTime;
@@ -119,12 +113,10 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
             }));
           }
         },
-
         pause() {
           if (!videoRef.current) return;
           videoRef.current.pause();
           setIsPlaying(false);
-
           if (isActive) {
             setGlobalPlaybackState((prev) => ({
               ...prev,
@@ -132,54 +124,36 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
             }));
           }
         },
-
-        prevSegment() {
-          if (isActive) changeSegment(-1);
-        },
-
-        nextSegment() {
-          if (isActive) changeSegment(1);
-        },
-
         seekToGlobalTime(timing: number) {
           const video = videoRef.current;
           if (!video || segements.length === 0) return;
-
           // 1️⃣ tìm segment phù hợp
           const targetIndex = findBestSegmentIndex(timing);
           const segment = segements[targetIndex];
           if (!segment) return;
-
           // 2️⃣ tính localTime trong video
           const localTime = Math.max(0, timing - segment.start);
-
           // 3️⃣ đổi segment nếu cần
           if (targetIndex !== activeSegmentIndex) {
             setActiveSegmentIndex(targetIndex);
             setSegmentLocalTime(localTime);
-
             // load video mới
             video.pause();
             video.src = segment.src;
             video.load();
-
             const onLoaded = () => {
               video.currentTime = localTime;
-
               if (isPlaying) {
                 video.play().catch(() => {});
               }
-
               video.removeEventListener("loadedmetadata", onLoaded);
             };
-
             video.addEventListener("loadedmetadata", onLoaded);
           } else {
             // cùng segment → chỉ seek
             video.currentTime = localTime;
             setSegmentLocalTime(localTime);
           }
-
           // 4️⃣ update global nếu camera active
           if (isActive) {
             setIsPlaying(true);
@@ -192,18 +166,12 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
             }));
           }
         },
-
-        setSpeed(newSpeed: number) {
-          if (!videoRef.current) return;
-          videoRef.current.playbackRate = newSpeed;
-          setSpeed(newSpeed);
-
-          if (isActive) {
-            setGlobalPlaybackState((prev) => ({
-              ...prev,
-              speed: newSpeed,
-            }));
-          }
+        setSpeed() {},
+        nextSegment() {
+          if (isActive) changeSegment(1);
+        },
+        prevSegment() {
+          if (isActive) changeSegment(-1);
         },
       }),
       [
@@ -226,57 +194,6 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
         }
       }
     }, [isPlaying, isActive]);
-
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-
-      let nextScale = scaleZoom + (e.deltaY > 0 ? -0.1 : 0.1);
-      nextScale = Math.min(Math.max(nextScale, 1), 5);
-
-      if (nextScale === 1) {
-        setOffset({ x: 0, y: 0 });
-      }
-
-      setScaleZoom(nextScale);
-    };
-
-    useEffect(() => {
-      const div = videoContentRef.current;
-      if (!div) return;
-
-      div.addEventListener("wheel", handleWheel, { passive: false });
-
-      return () => div.removeEventListener("wheel", handleWheel);
-    }, [handleWheel]);
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-      if (scaleZoom === 1) return;
-      setIsPanning(true);
-      lastPos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isPanning || !videoContentRef.current) return;
-
-      const dx = e.clientX - lastPos.current.x;
-      const dy = e.clientY - lastPos.current.y;
-
-      lastPos.current = { x: e.clientX, y: e.clientY };
-
-      const container = videoContentRef.current.getBoundingClientRect();
-      const videoW = container.width * scaleZoom;
-      const videoH = container.height * scaleZoom;
-
-      const maxX = (videoW - container.width) / 2;
-      const maxY = (videoH - container.height) / 2;
-
-      setOffset((prev) => ({
-        x: clamp(prev.x + dx, -maxX, maxX),
-        y: clamp(prev.y + dy, -maxY, maxY),
-      }));
-    };
-
-    const handleMouseUp = () => setIsPanning(false);
 
     const handleClick = () => {
       if (onSelect) {
@@ -312,6 +229,9 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
             activeSegment: activeSegmentIndex,
           }));
         }
+        // console.log("localTime", localTime);
+        // console.log("activeSegmentIndex", activeSegmentIndex);
+        // console.log("duration", video.duration);
 
         // nếu hết file video → chuyển sang segment tiếp theo
         if (localTime >= video.duration - 0.5) {
@@ -436,55 +356,111 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
 
         {/* Camera Content */}
         <div
-          className="camera-content flex-1 relative bg-slate-800 cursor-pointer"
+          className="camera-content flex-1 relative bg-slate-800"
           ref={videoContentRef}
-          onClick={handleClick}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onMouseMove={(e) => handleMouseMove(e.nativeEvent)}
+          onMouseEnter={() => setShowZoomControls(true)}
+          onMouseLeave={() => setShowZoomControls(false)}
         >
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            style={{
-              transform: `
-      scale(${scaleZoom})
-      translate(${offset.x / scaleZoom}px, ${offset.y / scaleZoom}px)
-    `,
-              transformOrigin: "center center",
-              transition: isPanning ? "none" : "transform 0.15s ease-out",
-              cursor: scaleZoom > 1 ? "grab" : "default",
+          <TransformWrapper
+            initialScale={1}
+            minScale={1}
+            maxScale={5}
+            limitToBounds={true}
+            centerOnInit={true}
+            wheel={{
+              step: 0.1,
+              wheelDisabled: false,
+              touchPadDisabled: false,
+              activationKeys: [],
+            }}
+            doubleClick={{
+              disabled: false,
+              mode: "zoomIn",
+            }}
+            panning={{
+              disabled: false,
+              velocityDisabled: false,
             }}
           >
-            <div className="absolute inset-0">
-              <img
-                src={generatePattern()}
-                alt={`Camera ${name}`}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <video
-              ref={videoRef}
-              autoPlay={false}
-              src={urlPlayback}
-              playsInline
-              muted
-              controls={false}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "fill",
-                zIndex: 2,
-              }}
-            />
-          </div>
+            {({ zoomIn, zoomOut, resetTransform }) => (
+              <>
+                <TransformComponent
+                  wrapperClass="w-full h-full"
+                  contentClass="w-full h-full flex items-center justify-center"
+                >
+                  <div
+                    className="relative w-full h-full flex items-center justify-center cursor-pointer"
+                    onClick={handleClick}
+                  >
+                    <div className="absolute inset-0">
+                      <img
+                        src={generatePattern()}
+                        alt={`Camera ${name}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <video
+                      ref={videoRef}
+                      autoPlay={false}
+                      src={urlPlayback}
+                      playsInline
+                      muted
+                      controls={false}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        zIndex: 2,
+                      }}
+                    />
+                  </div>
+                </TransformComponent>
 
-          {/* Active indicator */}
-          {isActive && (
-            <div className="absolute top-2 left-2 bg-blue-600 px-2 py-1 rounded text-xs text-white font-semibold shadow-lg z-20">
-              Đang chọn
-            </div>
-          )}
+                {/* Zoom Controls */}
+                {showZoomControls && (
+                  <div className="absolute top-2 right-2 z-20 flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        zoomIn();
+                      }}
+                      className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg shadow-lg transition-colors backdrop-blur-sm"
+                      title="Phóng to"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        zoomOut();
+                      }}
+                      className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg shadow-lg transition-colors backdrop-blur-sm"
+                      title="Thu nhỏ"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        resetTransform();
+                      }}
+                      className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg shadow-lg transition-colors backdrop-blur-sm"
+                      title="Đặt lại"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Active indicator */}
+                {isActive && (
+                  <div className="absolute top-2 left-2 bg-blue-600 px-2 py-1 rounded text-xs text-white font-semibold shadow-lg z-20 pointer-events-none">
+                    Đang chọn
+                  </div>
+                )}
+              </>
+            )}
+          </TransformWrapper>
         </div>
       </div>
     );
