@@ -189,10 +189,7 @@ function App() {
         ...value,
       }))
       .filter(
-        (item) =>
-          item.record &&
-          item.idRecord &&
-          (!item.segment || item.segment.length === 0)
+        (item) => item.idRecord && (!item.segment || item.segment.length === 0)
       );
 
     if (arr.length === 0) return;
@@ -207,7 +204,6 @@ function App() {
           };
         })
       );
-      console.log("results", results);
       setSegmentsByCameraId((prev) => {
         const next = { ...prev };
         results.forEach((r) => {
@@ -215,7 +211,6 @@ function App() {
             next[r.cameraId] = {
               ...next[r.cameraId],
               segment: [],
-              record: false,
               idRecord: "",
             };
           } else {
