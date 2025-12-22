@@ -10,6 +10,7 @@ import { X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { generatePattern } from "./CameraFeed";
 import { VideoSegment } from "../App";
+import { MTX_HOST, MTX_PORT } from "../../services/streamService";
 
 interface PlaybackFeedProps {
   id: string;
@@ -239,6 +240,10 @@ export const PlaybackFeed = forwardRef<PlaybackFeedHandle, PlaybackFeedProps>(
 
     const urlPlayback = useMemo(() => {
       if (segements.length === 0) return "";
+      // return (
+      //   `http://${MTX_HOST}:${MTX_PORT}` + segements[activeSegmentIndex]?.src ||
+      //   ""
+      // );
       return segements[activeSegmentIndex]?.src || "";
     }, [segements, activeSegmentIndex]);
 

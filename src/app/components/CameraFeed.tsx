@@ -268,7 +268,6 @@ export function LiveviewFeed({
     }
 
     setIsSettingsOpen(false);
-
     const updatedCameras = cameras.map((item) => {
       if (item.i === id) {
         return {
@@ -348,7 +347,7 @@ export function LiveviewFeed({
       };
 
       pc.onicecandidate = (event) => {
-        if (event.candidate) console.log("ICE:", event.candidate);
+        //  if (event.candidate) console.log("ICE:", event.candidate);
       };
 
       return pc;
@@ -366,7 +365,7 @@ export function LiveviewFeed({
         await pc.setLocalDescription(offer);
 
         const authHeader = "Basic " + btoa(`${VIEWER_USER}:${VIEWER_PASS}`);
-        // const urlgetWhep = `http://${MTX_HOST}:${MTX_PORT}${currentUrl}`;
+        const urlgetWhep = `http://${MTX_HOST}:${MTX_PORT}${currentUrl}`;
 
         // const response = await fetch(urlgetWhep, {
         const response = await fetch(currentUrl, {

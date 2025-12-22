@@ -39,7 +39,7 @@ export const getListStream = async (camId: string) => {
 
   try {
     const response = await axios.get(
-      // `http://${MTX_HOST}:${MTX_PORT}/api/videos?cameraId=${camId}&date=2025-12-19`,
+      // `http://${MTX_HOST}:${MTX_PORT}/api/videos?cameraId=${camId}&date=${today}`,
       `/api/videos?cameraId=${camId}&date=${today}`,
       { headers: { "Content-Type": "application/json" } }
     );
